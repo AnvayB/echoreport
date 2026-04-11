@@ -7,27 +7,29 @@ interface WeekDayCardProps {
   date: Date;
   hasEntry: boolean;
   isToday: boolean;
+  isSelected?: boolean;
   onClick: () => void;
 }
 
-const WeekDayCard = ({ date, hasEntry, isToday, onClick }: WeekDayCardProps) => {
+const WeekDayCard = ({ date, hasEntry, isToday, isSelected, onClick }: WeekDayCardProps) => {
   return (
     <Card
       className={cn(
         "cursor-pointer transition-colors hover:bg-accent",
-        isToday && "border-primary"
+        isToday && "border-primary",
+        isSelected && "bg-accent ring-1 ring-primary"
       )}
       onClick={onClick}
     >
-      <CardContent className="flex items-center justify-between p-4">
+      <CardContent className="flex items-center justify-between px-3 py-2.5">
         <div>
-          <p className="font-medium">{format(date, "EEEE")}</p>
-          <p className="text-sm text-muted-foreground">{format(date, "MMM d")}</p>
+          <p className="text-sm font-medium">{format(date, "EEE")}</p>
+          <p className="text-xs text-muted-foreground">{format(date, "MMM d")}</p>
         </div>
         {hasEntry ? (
-          <CheckCircle className="h-5 w-5 text-primary" />
+          <CheckCircle className="h-4 w-4 text-primary" />
         ) : (
-          <Circle className="h-5 w-5 text-muted-foreground" />
+          <Circle className="h-4 w-4 text-muted-foreground" />
         )}
       </CardContent>
     </Card>

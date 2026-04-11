@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import WeekDayCard from "@/components/WeekDayCard";
-import DailyEntryForm from "@/components/DailyEntryForm";
+import DailyEntryPanel from "@/components/DailyEntryPanel";
 import TasksForToday from "@/components/TasksForToday";
 import WeeklyReportGenerator from "@/components/WeeklyReportGenerator";
 import { getWeekdays, formatDateKey, formatWeekLabel, navigateWeek } from "@/lib/weekUtils";
@@ -15,10 +15,11 @@ const Dashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [entryDates, setEntryDates] = useState<Set<string>>(new Set());
 
   const weekdays = getWeekdays(currentWeek);
+  const today = new Date();
 
   const loadEntries = async () => {
     if (!user) return;
@@ -35,66 +36,66 @@ const Dashboard = () => {
     loadEntries();
   }, [user, currentWeek]);
 
-  if (selectedDay) {
-    return (
-      <div className="mx-auto max-w-2xl p-4">
-        <DailyEntryForm
-          date={selectedDay}
-          onBack={() => {
-            setSelectedDay(null);
-            loadEntries();
-          }}
-        />
-      </div>
-    );
-  }
-
-  const today = new Date();
-
   return (
-    <div className="mx-auto max-w-2xl p-4 space-y-6">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Work Journal</h1>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={signOut}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+      <header className="border-b bg-card">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+          <h1 className="text-xl font-bold">Work Journal</h1>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={signOut}>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Week navigation */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, -1))}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-lg font-medium">{formatWeekLabel(currentWeek)}</h2>
-        <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, 1))}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <main className="mx-auto max-w-7xl p-4">
+        {/* 3-column grid: calendar | tasks + daily entry | weekly report */}
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr_1fr] md:grid-cols-[240px_1fr]">
+          {/* Column 1: Calendar / Week view */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, -1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <h2 className="text-sm font-medium">{formatWeekLabel(currentWeek)}</h2>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-1.5">
+              {weekdays.map((day) => (
+                <WeekDayCard
+                  key={formatDateKey(day)}
+                  date={day}
+                  hasEntry={entryDates.has(formatDateKey(day))}
+                  isToday={isSameDay(day, today)}
+                  isSelected={isSameDay(day, selectedDay)}
+                  onClick={() => setSelectedDay(day)}
+                />
+              ))}
+            </div>
+          </div>
 
-      {/* Day cards */}
-      <div className="space-y-2">
-        {weekdays.map((day) => (
-          <WeekDayCard
-            key={formatDateKey(day)}
-            date={day}
-            hasEntry={entryDates.has(formatDateKey(day))}
-            isToday={isSameDay(day, today)}
-            onClick={() => setSelectedDay(day)}
-          />
-        ))}
-      </div>
+          {/* Column 2: Tasks for Today + Daily Entry */}
+          <div className="space-y-6">
+            <TasksForToday />
+            <DailyEntryPanel
+              date={selectedDay}
+              onSaved={loadEntries}
+            />
+          </div>
 
-      {/* Tasks for today */}
-      <TasksForToday />
-
-      {/* Weekly report */}
-      <WeeklyReportGenerator currentWeek={currentWeek} />
+          {/* Column 3: Weekly Report */}
+          <div className="md:col-span-2 lg:col-span-1">
+            <WeeklyReportGenerator currentWeek={currentWeek} />
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
