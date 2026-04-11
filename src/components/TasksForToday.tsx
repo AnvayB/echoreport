@@ -45,9 +45,9 @@ const TasksForToday = () => {
   };
 
   return (
-    <Card className="border-l-4 border-l-secondary">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-secondary">
+        <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks for Today
         </CardTitle>
       </CardHeader>

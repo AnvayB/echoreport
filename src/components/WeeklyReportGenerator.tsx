@@ -82,9 +82,9 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   };
 
   return (
-    <Card className="border-l-4 border-l-accent">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-accent">
+        <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" /> Weekly Report
         </CardTitle>
       </CardHeader>

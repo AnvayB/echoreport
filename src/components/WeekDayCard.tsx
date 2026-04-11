@@ -15,9 +15,9 @@ const WeekDayCard = ({ date, hasEntry, isToday, isSelected, onClick }: WeekDayCa
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all hover:bg-accent/10 hover:shadow-sm",
-        isToday && "border-primary shadow-sm",
-        isSelected && "bg-primary/5 ring-1 ring-primary"
+        "cursor-pointer transition-colors hover:bg-accent",
+        isToday && "border-primary",
+        isSelected && "bg-accent ring-1 ring-primary"
       )}
       onClick={onClick}
     >
@@ -27,7 +27,7 @@ const WeekDayCard = ({ date, hasEntry, isToday, isSelected, onClick }: WeekDayCa
           <p className="text-xs text-muted-foreground">{format(date, "MMM d")}</p>
         </div>
         {hasEntry ? (
-          <CheckCircle className="h-4 w-4 text-accent" />
+          <CheckCircle className="h-4 w-4 text-primary" />
         ) : (
           <Circle className="h-4 w-4 text-muted-foreground" />
         )}

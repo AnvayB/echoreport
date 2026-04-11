@@ -118,9 +118,9 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   };
 
   return (
-    <Card className="border-l-4 border-l-primary">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base text-primary">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Pencil className="h-4 w-4" />
           {formatDayLabel(date)}
         </CardTitle>
