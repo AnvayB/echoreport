@@ -29,7 +29,7 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Work Journal</CardTitle>
+          <CardTitle className="text-2xl">Echo Report</CardTitle>
           <CardDescription>Track your daily accomplishments and generate weekly reports</CardDescription>
         </CardHeader>
         <CardContent>
