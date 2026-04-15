@@ -24,6 +24,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   const [saving, setSaving] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState(false);
+  const [isFirstSave, setIsFirstSave] = useState(true);
 
   const dateKey = formatDateKey(date);
 
@@ -36,7 +37,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     setBlockers("");
     setNotes("");
     setParsed(false);
-
+    setIsFirstSave(true);
     supabase
       .from("daily_entries")
       .select("*")
@@ -51,6 +52,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
           setNotes(data.notes);
           if (data.accomplishments || data.pending_tasks || data.blockers || data.notes) {
             setParsed(true);
+            setIsFirstSave(false);
           }
         }
       });
@@ -101,7 +103,8 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       toast.error("Failed to save entry");
       console.error(error);
     } else {
-      toast.success("Entry saved");
+      toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
+      setIsFirstSave(false);
       onSaved();
     }
   };
