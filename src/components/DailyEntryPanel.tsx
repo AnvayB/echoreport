@@ -103,7 +103,8 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       toast.error("Failed to save entry");
       console.error(error);
     } else {
-      toast.success("Entry saved");
+      toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
+      setIsFirstSave(false);
       onSaved();
     }
   };
