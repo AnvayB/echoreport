@@ -10,34 +10,42 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { entry } = await req.json();
+    const { entry, completed_tasks } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are a productivity assistant. Given the user's previous workday entry, create a clear breakdown for today using proper markdown formatting.
+    let completedContext = "";
+    if (completed_tasks && completed_tasks.length > 0) {
+      completedContext = "\n\nPrevious task completion status:\n" +
+        completed_tasks.map((t: { task_text: string; completed: boolean; section: string }) =>
+          `- [${t.completed ? "DONE" : "NOT DONE"}] (${t.section}) ${t.task_text}`
+        ).join("\n");
+    }
 
-Use **bold** for section titles. Use markdown bullet points (- ) for items. Always leave a blank line before each section title. Use these sections:
+    const systemPrompt = `You are a productivity assistant. Given the user's previous workday entry, create a clear task breakdown for today.
 
-**Completed Yesterday**
+You MUST respond with valid JSON only. No markdown, no code fences, no explanation. The JSON must follow this exact structure:
 
-- item
+{
+  "sections": [
+    { "title": "Completed Yesterday", "items": ["item1", "item2"] },
+    { "title": "Pending for Today", "items": ["item1"] },
+    { "title": "Carryover, Blockers & Follow-ups", "items": ["item1"] }
+  ]
+}
 
-**Pending for Today**
-
-- item
-
-**Carryover, Blockers & Follow-ups**
-
-- item
-
-Be concise and professional. Do not use emojis. Use proper markdown formatting only. Ensure there is always a blank line between a section title and the next section title.`;
+Rules:
+- Each section must have a "title" and "items" array
+- Items should be concise, professional strings (no emojis)
+- Always include all three sections, even if items array is empty
+- If prior task completion status is provided, use it to inform what carries over vs what was done`;
 
     const userPrompt = `Here is my entry from the previous workday:
 
 Accomplishments: ${entry.accomplishments || "None recorded"}
 Pending Tasks: ${entry.pending_tasks || "None recorded"}
 Blockers: ${entry.blockers || "None recorded"}
-Notes: ${entry.notes || "None recorded"}
+Notes: ${entry.notes || "None recorded"}${completedContext}
 
 What are my tasks for today?`;
 
@@ -73,9 +81,21 @@ What are my tasks for today?`;
     }
 
     const data = await response.json();
-    const summary = data.choices?.[0]?.message?.content || "Unable to generate summary.";
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    // Try to parse as JSON, strip code fences if present
+    let parsed;
+    try {
+      const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // Fallback: return as markdown summary
+      return new Response(JSON.stringify({ summary: content }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    return new Response(JSON.stringify({ summary }), {
+    return new Response(JSON.stringify({ sections: parsed.sections }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
