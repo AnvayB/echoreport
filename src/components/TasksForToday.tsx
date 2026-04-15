@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
 import { Loader2, ListTodo } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 const TasksForToday = () => {
   const { user } = useAuth();
@@ -63,8 +64,8 @@ const TasksForToday = () => {
           </div>
         )}
         {result && (
-          <div className="whitespace-pre-wrap rounded-md bg-muted p-4 text-sm">
-            {result}
+          <div className="rounded-md bg-muted p-4 text-sm prose prose-sm max-w-none prose-strong:text-foreground prose-li:text-foreground prose-p:text-foreground prose-ul:my-1 prose-li:my-0.5">
+            <ReactMarkdown>{result}</ReactMarkdown>
           </div>
         )}
         {result && (
