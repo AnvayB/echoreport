@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig } from "lucide-react";
 import { toast } from "sonner";
 
 interface TaskItem {
@@ -188,25 +188,32 @@ const TasksForToday = () => {
                 <p className="font-semibold text-sm text-foreground mb-2">{section.title}</p>
                 <div className="space-y-1.5">
                   {section.items.map((item, ii) => (
-                    <label
-                      key={ii}
-                      className="flex items-start gap-2 cursor-pointer group"
-                    >
-                      <Checkbox
-                        checked={item.completed}
-                        onCheckedChange={() => toggleTask(si, ii)}
-                        className="mt-0.5"
-                      />
-                      <span
-                        className={`text-sm leading-snug transition-all ${
-                          item.completed
-                            ? "line-through text-muted-foreground"
-                            : "text-foreground"
-                        }`}
+                    section.title === "Completed Yesterday" ? (
+                      <div key={ii} className="flex items-start gap-2">
+                        <CircleCheckBig className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <span className="text-sm leading-snug text-muted-foreground">{item.text}</span>
+                      </div>
+                    ) : (
+                      <label
+                        key={ii}
+                        className="flex items-start gap-2 cursor-pointer group"
                       >
-                        {item.text}
-                      </span>
-                    </label>
+                        <Checkbox
+                          checked={item.completed}
+                          onCheckedChange={() => toggleTask(si, ii)}
+                          className="mt-0.5"
+                        />
+                        <span
+                          className={`text-sm leading-snug transition-all ${
+                            item.completed
+                              ? "line-through text-muted-foreground"
+                              : "text-foreground"
+                          }`}
+                        >
+                          {item.text}
+                        </span>
+                      </label>
+                    )
                   ))}
                 </div>
               </div>
