@@ -37,7 +37,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     setBlockers("");
     setNotes("");
     setParsed(false);
-
+    setIsFirstSave(true);
     supabase
       .from("daily_entries")
       .select("*")
