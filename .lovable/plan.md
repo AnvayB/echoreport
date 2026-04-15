@@ -1,93 +1,59 @@
 
 
-# Productivity Journal & Weekly Report App
+# Interactive Task Checkboxes for "Tasks for Today"
 
 ## Overview
-A personal work journal with AI-powered weekly report generation. Google login, daily accomplishment tracking, next-day task retrieval, and a Friday weekly email draft generator.
+Replace the markdown bullet-point rendering in Tasks for Today with interactive checkboxes. Checked tasks get a strikethrough. Task completion status is persisted in a new database table and fed as context to the AI when generating daily reports and next-day tasks.
 
-## Architecture
-- **Frontend**: React + Tailwind + shadcn/ui
-- **Backend**: Lovable Cloud (Supabase) — database, auth, edge functions
-- **AI**: Lovable AI Gateway for daily recaps, task breakdowns, and weekly report generation
-- **Auth**: Google login via Lovable Cloud
+## Database Change
 
-## Database Schema
+**New table: `daily_tasks`**
+Stores individual parsed tasks with their completion status.
 
-### `daily_entries` table
-- `id`, `user_id`, `entry_date`, `accomplishments` (text), `pending_tasks` (text), `blockers` (text), `notes` (text), `created_at`, `updated_at`
-- RLS: users can only access their own entries
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK, default gen_random_uuid() |
+| user_id | uuid | NOT NULL |
+| task_date | date | NOT NULL (the day the tasks are for) |
+| section | text | NOT NULL (e.g. "Completed Yesterday", "Pending for Today", "Carryover, Blockers & Follow-ups") |
+| task_text | text | NOT NULL |
+| completed | boolean | NOT NULL, default false |
+| created_at | timestamptz | default now() |
 
-### `weekly_reports` table
-- `id`, `user_id`, `week_start`, `week_end`, `report_draft` (text), `email_template` (text), `created_at`, `updated_at`
-- RLS: users can only access their own reports
+RLS: users can only CRUD their own rows (same pattern as daily_entries).
 
-### `user_settings` table
-- `id`, `user_id`, `email_template` (text — configurable weekly report format/style prompt)
-- RLS: users can only access their own settings
+## Edge Function Change: `ai-daily-tasks`
 
-## Pages & Components
+- Update the system prompt to return **structured JSON** instead of markdown. The response will be an object with section keys mapping to arrays of task strings.
+- Accept an optional `completed_tasks` field in the request body so prior completion data can inform the AI.
 
-### 1. Login Page
-- Google sign-in button, minimal branding
+Example JSON output:
+```json
+{
+  "sections": [
+    { "title": "Completed Yesterday", "items": ["Task A", "Task B"] },
+    { "title": "Pending for Today", "items": ["Task C"] },
+    { "title": "Carryover, Blockers & Follow-ups", "items": ["Task D"] }
+  ]
+}
+```
 
-### 2. Dashboard (Current Week)
-- Week label (e.g., "April 6–10, 2026")
-- Day cards (Mon–Fri) showing entry status (completed/empty)
-- Click a day to open the daily entry form
-- "What are my tasks for today?" button — fetches yesterday's pending items via AI summary
-- "Generate Weekly Report" button (visible on Friday or anytime)
+## Frontend: `TasksForToday.tsx`
 
-### 3. Daily Entry Form
-- Date header
-- Text areas for: Accomplishments, Pending Tasks, Blockers/Notes
-- Voice input button (Web Speech API) that transcribes into the active text field
-- Save button → persists to `daily_entries`
+1. **Parse AI response** into a structured state: an array of sections, each with a title and items (each item has text + completed boolean).
+2. **Render each item as a Checkbox** (using the existing `Checkbox` component) with the task text next to it. Checked items get `line-through` styling.
+3. **On toggle**, update the `daily_tasks` table (upsert the completion status) and update local state.
+4. **On load**, check the `daily_tasks` table for existing tasks for today to restore prior state.
 
-### 4. "Tasks for Today" View
-- AI reads yesterday's entry and presents: what was completed, what's still pending, carryover items
-- Clean card/list layout
+## Context Feed-Through
 
-### 5. Weekly Report Generator
-- Collects all daily entries for the selected week
-- Sends to AI with the user's email template/prompt
-- Displays editable text area with the generated email draft
-- Copy-to-clipboard button
-- Save draft button → persists to `weekly_reports`
+- **`ai-daily-tasks` edge function**: When generating tasks, also query `daily_tasks` for the previous workday and include completion status in the prompt (e.g., "Task X - completed", "Task Y - not completed").
+- **Daily entry panel**: No changes needed -- the AI already reads from `daily_entries`. The new task completion data provides supplementary context through the tasks function.
 
-### 6. Settings Page
-- Editable email template/prompt textarea
-- Example default template provided
+## Technical Details
 
-## Edge Functions
-
-### `ai-daily-tasks`
-- Input: previous day's entry
-- Output: structured task breakdown for today
-
-### `ai-weekly-report`
-- Input: all daily entries for the week + user's email template
-- Output: formatted weekly email draft
-
-## Voice Input
-- Browser Web Speech API (`SpeechRecognition`)
-- Microphone button on each text field in the daily entry form
-- Transcribed text appended to the active field
-- Graceful fallback if browser doesn't support it
-
-## Key UX Details
-- Week navigation (prev/next week)
-- Auto-save or explicit save for daily entries
-- Toast notifications for save confirmations
-- Mobile-responsive layout
-- Clean, minimal design — light theme, card-based layout
-
-## Implementation Order
-1. Set up Lovable Cloud + Google auth + database tables with RLS
-2. Login page + auth flow
-3. Dashboard with week view and day cards
-4. Daily entry form (text input + save/retrieve)
-5. "Tasks for today" AI assistant view
-6. Weekly report generator with editable draft
-7. Settings page for email template
-8. Voice input enhancement
+- Migration SQL creates `daily_tasks` table with RLS policies
+- `TasksForToday.tsx` switches from ReactMarkdown to custom rendering with Checkbox components
+- Edge function returns JSON; falls back gracefully if parsing fails
+- Completion toggles are saved immediately via upsert to `daily_tasks`
 
