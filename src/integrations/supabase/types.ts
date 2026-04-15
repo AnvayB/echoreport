@@ -50,6 +50,36 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_tasks: {
+        Row: {
+          completed: boolean
+          created_at: string
+          id: string
+          section: string
+          task_date: string
+          task_text: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          section: string
+          task_date: string
+          task_text: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          section?: string
+          task_date?: string
+          task_text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string
