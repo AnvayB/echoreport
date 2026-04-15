@@ -24,6 +24,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   const [saving, setSaving] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState(false);
+  const [isFirstSave, setIsFirstSave] = useState(true);
 
   const dateKey = formatDateKey(date);
 
