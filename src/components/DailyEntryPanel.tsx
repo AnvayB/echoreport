@@ -52,6 +52,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
           setNotes(data.notes);
           if (data.accomplishments || data.pending_tasks || data.blockers || data.notes) {
             setParsed(true);
+            setIsFirstSave(false);
           }
         }
       });
