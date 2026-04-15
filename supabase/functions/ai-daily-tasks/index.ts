@@ -14,20 +14,23 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are a productivity assistant. Given the user's previous workday entry, create a clear breakdown for today using proper markdown formatting:
+    const systemPrompt = `You are a productivity assistant. Given the user's previous workday entry, create a clear breakdown for today using proper markdown formatting.
 
-Use **bold** for section titles. Use markdown bullet points (- ) for items. Use these sections:
+Use **bold** for section titles. Use markdown bullet points (- ) for items. Always leave a blank line before each section title. Use these sections:
 
 **Completed Yesterday**
+
 - item
 
 **Pending for Today**
+
 - item
 
 **Carryover, Blockers & Follow-ups**
+
 - item
 
-Be concise and professional. Do not use emojis. Use proper markdown formatting only.`;
+Be concise and professional. Do not use emojis. Use proper markdown formatting only. Ensure there is always a blank line between a section title and the next section title.`;
 
     const userPrompt = `Here is my entry from the previous workday:
 

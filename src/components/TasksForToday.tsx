@@ -64,7 +64,7 @@ const TasksForToday = () => {
           </div>
         )}
         {result && (
-          <div className="rounded-md bg-muted p-4 text-sm prose prose-sm max-w-none prose-strong:text-foreground prose-li:text-foreground prose-p:text-foreground prose-ul:my-1 prose-li:my-0.5">
+          <div className="rounded-md bg-muted p-4 text-sm prose prose-sm max-w-none prose-strong:text-foreground prose-li:text-foreground prose-p:text-foreground prose-ul:my-1 prose-li:my-0.5 [&>p:has(strong)]:mt-4 [&>p:has(strong):first-child]:mt-0">
             <ReactMarkdown>{result}</ReactMarkdown>
           </div>
         )}
