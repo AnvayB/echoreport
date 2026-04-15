@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig } from "lucide-react";
 import { toast } from "sonner";
 
 interface TaskItem {
