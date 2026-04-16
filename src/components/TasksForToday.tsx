@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface TaskItem {
@@ -22,6 +22,8 @@ const TasksForToday = () => {
   const { user } = useAuth();
   const [sections, setSections] = useState<TaskSection[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savedKey, setSavedKey] = useState<string | null>(null);
   const todayKey = formatDateKey(new Date());
 
   // Load existing tasks from DB on mount
@@ -148,6 +150,9 @@ const TasksForToday = () => {
     setSections(updated);
 
     const task = updated[sectionIdx].items[itemIdx];
+    const key = `${sectionIdx}-${itemIdx}`;
+    setSavingKey(key);
+
     // Update in DB
     const { data: existing } = await supabase
       .from("daily_tasks")
@@ -159,7 +164,23 @@ const TasksForToday = () => {
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("daily_tasks").update({ completed: task.completed }).eq("id", existing.id);
+      const { error } = await supabase
+        .from("daily_tasks")
+        .update({ completed: task.completed })
+        .eq("id", existing.id);
+      setSavingKey(null);
+      if (error) {
+        toast.error("Couldn't save task status");
+        return;
+      }
+      toast.success(
+        task.completed ? "Task marked complete — saved as context" : "Task marked incomplete — saved"
+      );
+      setSavedKey(key);
+      setTimeout(() => setSavedKey((k) => (k === key ? null : k)), 1500);
+    } else {
+      setSavingKey(null);
+      toast.error("Couldn't find task to update");
     }
   };
 
