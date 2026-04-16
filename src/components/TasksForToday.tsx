@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig, Check } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface TaskItem {
@@ -24,6 +25,8 @@ const TasksForToday = () => {
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [newTasksText, setNewTasksText] = useState("");
+  const [adding, setAdding] = useState(false);
   const todayKey = formatDateKey(new Date());
 
   // Load existing tasks from DB on mount
@@ -184,6 +187,59 @@ const TasksForToday = () => {
     }
   };
 
+  const addMoreTasks = async () => {
+    if (!user) return;
+    const text = newTasksText.trim();
+    if (!text) {
+      toast.error("Please enter some tasks first");
+      return;
+    }
+    setAdding(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
+        body: { text },
+      });
+      if (error) throw error;
+      const items: string[] = Array.isArray(data?.items) ? data.items : [];
+      if (items.length === 0) {
+        toast.error("Couldn't extract any tasks from that text");
+        return;
+      }
+
+      const targetTitle = "Pending for Today";
+      const current = sections ?? [];
+      const hasTarget = current.some((s) => s.title === targetTitle);
+      const newItems: TaskItem[] = items.map((t) => ({ text: t, completed: false }));
+
+      const updated: TaskSection[] = hasTarget
+        ? current.map((s) =>
+            s.title === targetTitle ? { ...s, items: [...s.items, ...newItems] } : s
+          )
+        : [...current, { title: targetTitle, items: newItems }];
+
+      setSections(updated);
+
+      // Persist only the new rows (avoid wiping completion state of existing tasks)
+      const rows = newItems.map((item) => ({
+        user_id: user.id,
+        task_date: todayKey,
+        section: targetTitle,
+        task_text: item.text,
+        completed: item.completed,
+      }));
+      const { error: insertError } = await supabase.from("daily_tasks").insert(rows);
+      if (insertError) throw insertError;
+
+      setNewTasksText("");
+      toast.success(`Added ${items.length} task${items.length === 1 ? "" : "s"}`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to add tasks");
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -258,9 +314,34 @@ const TasksForToday = () => {
           </div>
         )}
         {sections && (
-          <Button onClick={fetchTasks} variant="ghost" size="sm" className="mt-3">
-            Refresh
-          </Button>
+          <div className="mt-4 space-y-2 border-t border-border pt-4">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Plus className="h-4 w-4" /> Add More Tasks
+            </label>
+            <Textarea
+              value={newTasksText}
+              onChange={(e) => setNewTasksText(e.target.value)}
+              placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
+              className="min-h-[60px]"
+              disabled={adding}
+            />
+            <div className="flex items-center gap-2">
+              <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
+                {adding ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Parsing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks
+                  </>
+                )}
+              </Button>
+              <Button onClick={fetchTasks} variant="ghost" size="sm" disabled={adding}>
+                Refresh
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
