@@ -215,25 +215,41 @@ const TasksForToday = () => {
                         <span className="text-sm leading-snug text-muted-foreground">{item.text}</span>
                       </div>
                     ) : (
-                      <label
-                        key={ii}
-                        className="flex items-start gap-2 cursor-pointer group"
-                      >
-                        <Checkbox
-                          checked={item.completed}
-                          onCheckedChange={() => toggleTask(si, ii)}
-                          className="mt-0.5"
-                        />
-                        <span
-                          className={`text-sm leading-snug transition-all ${
-                            item.completed
-                              ? "line-through text-muted-foreground"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {item.text}
-                        </span>
-                      </label>
+                      (() => {
+                        const key = `${si}-${ii}`;
+                        const isSaving = savingKey === key;
+                        const isSaved = savedKey === key;
+                        return (
+                          <label
+                            key={ii}
+                            className="flex items-start gap-2 cursor-pointer group"
+                          >
+                            <Checkbox
+                              checked={item.completed}
+                              onCheckedChange={() => toggleTask(si, ii)}
+                              className="mt-0.5"
+                              disabled={isSaving}
+                            />
+                            <span
+                              className={`text-sm leading-snug transition-all flex-1 ${
+                                item.completed
+                                  ? "line-through text-muted-foreground"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {item.text}
+                            </span>
+                            {isSaving && (
+                              <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
+                            )}
+                            {isSaved && !isSaving && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
+                                <Check className="h-3 w-3" /> Saved
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })()
                     )
                   ))}
                 </div>
