@@ -187,6 +187,59 @@ const TasksForToday = () => {
     }
   };
 
+  const addMoreTasks = async () => {
+    if (!user) return;
+    const text = newTasksText.trim();
+    if (!text) {
+      toast.error("Please enter some tasks first");
+      return;
+    }
+    setAdding(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
+        body: { text },
+      });
+      if (error) throw error;
+      const items: string[] = Array.isArray(data?.items) ? data.items : [];
+      if (items.length === 0) {
+        toast.error("Couldn't extract any tasks from that text");
+        return;
+      }
+
+      const targetTitle = "Pending for Today";
+      const current = sections ?? [];
+      const hasTarget = current.some((s) => s.title === targetTitle);
+      const newItems: TaskItem[] = items.map((t) => ({ text: t, completed: false }));
+
+      const updated: TaskSection[] = hasTarget
+        ? current.map((s) =>
+            s.title === targetTitle ? { ...s, items: [...s.items, ...newItems] } : s
+          )
+        : [...current, { title: targetTitle, items: newItems }];
+
+      setSections(updated);
+
+      // Persist only the new rows (avoid wiping completion state of existing tasks)
+      const rows = newItems.map((item) => ({
+        user_id: user.id,
+        task_date: todayKey,
+        section: targetTitle,
+        task_text: item.text,
+        completed: item.completed,
+      }));
+      const { error: insertError } = await supabase.from("daily_tasks").insert(rows);
+      if (insertError) throw insertError;
+
+      setNewTasksText("");
+      toast.success(`Added ${items.length} task${items.length === 1 ? "" : "s"}`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to add tasks");
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
