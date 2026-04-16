@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface TaskItem {
@@ -22,6 +22,8 @@ const TasksForToday = () => {
   const { user } = useAuth();
   const [sections, setSections] = useState<TaskSection[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savedKey, setSavedKey] = useState<string | null>(null);
   const todayKey = formatDateKey(new Date());
 
   // Load existing tasks from DB on mount
@@ -148,6 +150,9 @@ const TasksForToday = () => {
     setSections(updated);
 
     const task = updated[sectionIdx].items[itemIdx];
+    const key = `${sectionIdx}-${itemIdx}`;
+    setSavingKey(key);
+
     // Update in DB
     const { data: existing } = await supabase
       .from("daily_tasks")
@@ -159,7 +164,23 @@ const TasksForToday = () => {
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("daily_tasks").update({ completed: task.completed }).eq("id", existing.id);
+      const { error } = await supabase
+        .from("daily_tasks")
+        .update({ completed: task.completed })
+        .eq("id", existing.id);
+      setSavingKey(null);
+      if (error) {
+        toast.error("Couldn't save task status");
+        return;
+      }
+      toast.success(
+        task.completed ? "Task marked complete — saved as context" : "Task marked incomplete — saved"
+      );
+      setSavedKey(key);
+      setTimeout(() => setSavedKey((k) => (k === key ? null : k)), 1500);
+    } else {
+      setSavingKey(null);
+      toast.error("Couldn't find task to update");
     }
   };
 
@@ -194,25 +215,41 @@ const TasksForToday = () => {
                         <span className="text-sm leading-snug text-muted-foreground">{item.text}</span>
                       </div>
                     ) : (
-                      <label
-                        key={ii}
-                        className="flex items-start gap-2 cursor-pointer group"
-                      >
-                        <Checkbox
-                          checked={item.completed}
-                          onCheckedChange={() => toggleTask(si, ii)}
-                          className="mt-0.5"
-                        />
-                        <span
-                          className={`text-sm leading-snug transition-all ${
-                            item.completed
-                              ? "line-through text-muted-foreground"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {item.text}
-                        </span>
-                      </label>
+                      (() => {
+                        const key = `${si}-${ii}`;
+                        const isSaving = savingKey === key;
+                        const isSaved = savedKey === key;
+                        return (
+                          <label
+                            key={ii}
+                            className="flex items-start gap-2 cursor-pointer group"
+                          >
+                            <Checkbox
+                              checked={item.completed}
+                              onCheckedChange={() => toggleTask(si, ii)}
+                              className="mt-0.5"
+                              disabled={isSaving}
+                            />
+                            <span
+                              className={`text-sm leading-snug transition-all flex-1 ${
+                                item.completed
+                                  ? "line-through text-muted-foreground"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {item.text}
+                            </span>
+                            {isSaving && (
+                              <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
+                            )}
+                            {isSaved && !isSaving && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
+                                <Check className="h-3 w-3" /> Saved
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })()
                     )
                   ))}
                 </div>
