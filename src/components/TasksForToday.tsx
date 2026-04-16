@@ -25,6 +25,8 @@ const TasksForToday = () => {
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [newTasksText, setNewTasksText] = useState("");
+  const [adding, setAdding] = useState(false);
   const todayKey = formatDateKey(new Date());
 
   // Load existing tasks from DB on mount
