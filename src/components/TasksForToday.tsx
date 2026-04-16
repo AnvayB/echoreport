@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig, Check } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface TaskItem {
