@@ -314,9 +314,34 @@ const TasksForToday = () => {
           </div>
         )}
         {sections && (
-          <Button onClick={fetchTasks} variant="ghost" size="sm" className="mt-3">
-            Refresh
-          </Button>
+          <div className="mt-4 space-y-2 border-t border-border pt-4">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Plus className="h-4 w-4" /> Add More Tasks
+            </label>
+            <Textarea
+              value={newTasksText}
+              onChange={(e) => setNewTasksText(e.target.value)}
+              placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
+              className="min-h-[60px]"
+              disabled={adding}
+            />
+            <div className="flex items-center gap-2">
+              <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
+                {adding ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Parsing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks
+                  </>
+                )}
+              </Button>
+              <Button onClick={fetchTasks} variant="ghost" size="sm" disabled={adding}>
+                Refresh
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
