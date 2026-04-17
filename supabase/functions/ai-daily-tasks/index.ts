@@ -10,15 +10,23 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { entry, completed_tasks } = await req.json();
+    const { entry, completed_tasks, incomplete_carryover } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     let completedContext = "";
     if (completed_tasks && completed_tasks.length > 0) {
-      completedContext = "\n\nPrevious task completion status:\n" +
+      completedContext = "\n\nYesterday's task completion status (from checkboxes):\n" +
         completed_tasks.map((t: { task_text: string; completed: boolean; section: string }) =>
           `- [${t.completed ? "DONE" : "NOT DONE"}] (${t.section}) ${t.task_text}`
+        ).join("\n");
+    }
+
+    let carryoverContext = "";
+    if (incomplete_carryover && incomplete_carryover.length > 0) {
+      carryoverContext = "\n\nUnchecked tasks from past days (MUST appear in today's plan as carryover or pending — do NOT drop them):\n" +
+        incomplete_carryover.map((t: { task_text: string; task_date: string; section: string }) =>
+          `- (from ${t.task_date}, ${t.section}) ${t.task_text}`
         ).join("\n");
     }
 
@@ -39,18 +47,22 @@ You MUST respond with valid JSON only. No markdown, no code fences, no explanati
 
 Rules:
 - "Completed Yesterday" and "Carryover, Blockers & Follow-ups" use a flat "items" array of strings.
-- "Pending for Today" MUST use "subsections" (NOT "items"). Group today's tasks into 2-5 logical subsections by project, theme, or workstream (e.g. "Data Pipeline", "Jira Integration", "Stakeholder Coordination", "Admin & Follow-ups"). Each subsection has a short "title" (2-5 words) and an "items" array.
+- "Pending for Today" MUST use "subsections" (NOT "items"). Group today's tasks into 2-5 logical subsections by project, theme, or workstream. Each subsection has a short "title" (2-5 words) and an "items" array.
 - If there are very few pending tasks (<=3 total), you may use a single subsection titled "General".
 - Items should be concise, professional strings (no emojis, no bullet markers).
 - Always include all three top-level sections, even if empty.
-- If prior task completion status is provided, use it to inform what carries over vs what was done.`;
+
+CRITICAL CARRYOVER RULES:
+- "Completed Yesterday" MUST include BOTH the user's accomplishments text AND every task marked DONE in yesterday's checkbox status. Merge/dedupe sensibly.
+- Every task marked NOT DONE from yesterday's checkboxes, AND every unchecked task from past days listed below, MUST appear somewhere in today's plan — either inside "Pending for Today" subsections (if still actionable today) or in "Carryover, Blockers & Follow-ups". Never drop a pending task silently.
+- Preserve the original wording of carryover tasks closely; only lightly rephrase for clarity.`;
 
     const userPrompt = `Here is my entry from the previous workday:
 
 Accomplishments: ${entry.accomplishments || "None recorded"}
 Pending Tasks: ${entry.pending_tasks || "None recorded"}
 Blockers: ${entry.blockers || "None recorded"}
-Notes: ${entry.notes || "None recorded"}${completedContext}
+Notes: ${entry.notes || "None recorded"}${completedContext}${carryoverContext}
 
 What are my tasks for today?`;
 

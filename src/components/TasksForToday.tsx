@@ -93,7 +93,7 @@ const TasksForToday = () => {
     const prevDay = getPreviousWorkday(new Date());
     const prevKey = formatDateKey(prevDay);
 
-    const [entryRes, tasksRes] = await Promise.all([
+    const [entryRes, prevTasksRes, incompletePastRes] = await Promise.all([
       supabase
         .from("daily_entries")
         .select("*")
@@ -102,22 +102,40 @@ const TasksForToday = () => {
         .maybeSingle(),
       supabase
         .from("daily_tasks")
-        .select("task_text, completed, section")
+        .select("task_text, completed, section, task_date")
         .eq("user_id", user.id)
         .eq("task_date", prevKey),
+      // All unchecked tasks from any prior day (carryover candidates)
+      supabase
+        .from("daily_tasks")
+        .select("task_text, section, task_date")
+        .eq("user_id", user.id)
+        .eq("completed", false)
+        .lt("task_date", todayKey),
     ]);
 
-    if (!entryRes.data) {
-      setSections([{ title: "Info", items: [{ text: "No entry found for the previous workday. Start fresh today!", completed: false }] }]);
+    if (!entryRes.data && (!incompletePastRes.data || incompletePastRes.data.length === 0)) {
+      setSections([{ title: "Info", items: [{ text: "No entry found for the previous workday and no pending tasks. Start fresh today!", completed: false }] }]);
       setLoading(false);
       return;
     }
 
+    // Dedupe carryover by task_text, keep oldest date
+    const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
+    (incompletePastRes.data || []).forEach((r) => {
+      const existing = carryoverMap.get(r.task_text);
+      if (!existing || r.task_date < existing.task_date) {
+        carryoverMap.set(r.task_text, r);
+      }
+    });
+    const carryover = Array.from(carryoverMap.values());
+
     try {
       const { data, error } = await supabase.functions.invoke("ai-daily-tasks", {
         body: {
-          entry: entryRes.data,
-          completed_tasks: tasksRes.data || [],
+          entry: entryRes.data || { accomplishments: "", pending_tasks: "", blockers: "", notes: "" },
+          completed_tasks: prevTasksRes.data || [],
+          incomplete_carryover: carryover,
         },
       });
       if (error) throw error;
