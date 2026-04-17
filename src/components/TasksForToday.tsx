@@ -562,6 +562,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   );
 };
