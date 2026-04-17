@@ -114,7 +114,45 @@ const TasksForToday = () => {
         .lt("task_date", todayKey),
     ]);
 
-    if (!entryRes.data && (!incompletePastRes.data || incompletePastRes.data.length === 0)) {
+    // Backfill safety net: if yesterday has an entry but ZERO daily_tasks rows,
+    // retroactively parse the EOD pending_tasks into daily_tasks rows so they
+    // can be carried over and reconciled.
+    let prevTasks = prevTasksRes.data || [];
+    let carryoverData = incompletePastRes.data || [];
+    if (entryRes.data && prevTasks.length === 0 && (entryRes.data.pending_tasks || "").trim()) {
+      try {
+        const { data: parsed } = await supabase.functions.invoke("ai-parse-tasks", {
+          body: { text: entryRes.data.pending_tasks },
+        });
+        const items: string[] = Array.isArray(parsed?.items) ? parsed.items : [];
+        if (items.length > 0) {
+          const seedSection = "Pending for Today › From EOD Entry";
+          const seedRows = items.map((t) => ({
+            user_id: user.id,
+            task_date: prevKey,
+            section: seedSection,
+            task_text: t,
+            completed: false,
+          }));
+          await supabase.from("daily_tasks").insert(seedRows);
+          prevTasks = seedRows.map((r) => ({
+            task_text: r.task_text,
+            completed: r.completed,
+            section: r.section,
+            task_date: r.task_date,
+          }));
+          // Merge into carryover candidates too
+          carryoverData = [
+            ...carryoverData,
+            ...seedRows.map((r) => ({ task_text: r.task_text, section: r.section, task_date: r.task_date })),
+          ];
+        }
+      } catch (e) {
+        console.error("Backfill seed failed:", e);
+      }
+    }
+
+    if (!entryRes.data && carryoverData.length === 0) {
       setSections([{ title: "Info", items: [{ text: "No entry found for the previous workday and no pending tasks. Start fresh today!", completed: false }] }]);
       setLoading(false);
       return;
@@ -122,7 +160,7 @@ const TasksForToday = () => {
 
     // Dedupe carryover by task_text, keep oldest date
     const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
-    (incompletePastRes.data || []).forEach((r) => {
+    carryoverData.forEach((r) => {
       const existing = carryoverMap.get(r.task_text);
       if (!existing || r.task_date < existing.task_date) {
         carryoverMap.set(r.task_text, r);
@@ -130,12 +168,19 @@ const TasksForToday = () => {
     });
     const carryover = Array.from(carryoverMap.values());
 
+    // Build exclusion list: tasks explicitly completed yesterday — these MUST NOT
+    // appear as pending today even if the EOD prose mentions them.
+    const completedExclusion = prevTasks
+      .filter((t) => t.completed)
+      .map((t) => t.task_text);
+
     try {
       const { data, error } = await supabase.functions.invoke("ai-daily-tasks", {
         body: {
           entry: entryRes.data || { accomplishments: "", pending_tasks: "", blockers: "", notes: "" },
-          completed_tasks: prevTasksRes.data || [],
+          completed_tasks: prevTasks,
           incomplete_carryover: carryover,
+          completed_exclusion: completedExclusion,
         },
       });
       if (error) throw error;
