@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { isSameDay } from "date-fns";
 
 interface TaskItem {
   text: string;
@@ -30,7 +31,11 @@ const SECTION_SEPARATOR = " › ";
 const PENDING_TITLE = "Pending for Today";
 const TOP_ORDER = ["Completed Yesterday", PENDING_TITLE, "Carryover, Blockers & Follow-ups"];
 
-const TasksForToday = () => {
+interface TasksForTodayProps {
+  selectedDate?: Date;
+}
+
+const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const { user } = useAuth();
   const [sections, setSections] = useState<TaskSection[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,6 +44,13 @@ const TasksForToday = () => {
   const [newTasksText, setNewTasksText] = useState("");
   const [adding, setAdding] = useState(false);
   const todayKey = formatDateKey(new Date());
+  const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-collapse when navigating to a past/future day; auto-expand on today
+  useEffect(() => {
+    setExpanded(isViewingToday);
+  }, [isViewingToday]);
 
   // Load existing tasks from DB on mount
   useEffect(() => {
