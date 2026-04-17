@@ -471,11 +471,24 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader
+        className={!isViewingToday ? "cursor-pointer select-none" : undefined}
+        onClick={!isViewingToday ? () => setExpanded((v) => !v) : undefined}
+      >
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks for Today
+          {!isViewingToday && (
+            <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+              {expanded ? (
+                <>Hide <ChevronUp className="h-3.5 w-3.5" /></>
+              ) : (
+                <>Show <ChevronDown className="h-3.5 w-3.5" /></>
+              )}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
+      {expanded && (
       <CardContent>
         {!sections && !loading && (
           <Button onClick={fetchTasks} variant="outline" className="w-full">
