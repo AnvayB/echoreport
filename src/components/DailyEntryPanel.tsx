@@ -84,6 +84,38 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     }
   };
 
+  const seedTasksFromPending = async (pendingText: string) => {
+    if (!user || !pendingText.trim()) return;
+    const seedSection = "Pending for Today › From EOD Entry";
+    const { data: existing } = await supabase
+      .from("daily_tasks")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("task_date", dateKey)
+      .eq("section", seedSection)
+      .limit(1);
+    if (existing && existing.length > 0) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
+        body: { text: pendingText },
+      });
+      if (error) throw error;
+      const items: string[] = Array.isArray(data?.items) ? data.items : [];
+      if (items.length === 0) return;
+      const rows = items.map((t) => ({
+        user_id: user.id,
+        task_date: dateKey,
+        section: seedSection,
+        task_text: t,
+        completed: false,
+      }));
+      await supabase.from("daily_tasks").insert(rows);
+    } catch (e) {
+      console.error("Failed to seed tasks from EOD pending:", e);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -106,6 +138,8 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
       setIsFirstSave(false);
       onSaved();
+      // Fire-and-forget: seed pending_tasks into daily_tasks for tomorrow's carryover
+      seedTasksFromPending(pendingTasks);
     }
   };
 
