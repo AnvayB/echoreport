@@ -61,14 +61,19 @@ Rules:
 CRITICAL CARRYOVER RULES:
 - "Completed Yesterday" MUST include BOTH the user's accomplishments text AND every task marked DONE in yesterday's checkbox status. Merge/dedupe sensibly.
 - Every task marked NOT DONE from yesterday's checkboxes, AND every unchecked task from past days listed below, MUST appear somewhere in today's plan — either inside "Pending for Today" subsections (if still actionable today) or in "Carryover, Blockers & Follow-ups". Never drop a pending task silently.
-- Preserve the original wording of carryover tasks closely; only lightly rephrase for clarity.`;
+- Preserve the original wording of carryover tasks closely; only lightly rephrase for clarity.
+
+RECONCILIATION RULES (extremely important):
+- The "Pending Tasks" text in the entry below is a SNAPSHOT written before checkboxes were toggled. Treat the EXCLUSION LIST and the DONE checkbox statuses as AUTHORITATIVE: if an item from the Pending Tasks prose matches (even loosely) an item in the exclusion list, place it ONLY in "Completed Yesterday".
+- Carryover (unchecked from past days) and explicit checkbox NOT DONE items take PRIORITY over re-extracting tasks from the Pending Tasks prose. Do not duplicate them.
+- Do NOT invent tasks. Every item in today's plan must be grounded in: (a) the EOD entry text, (b) explicit carryover from past days, or (c) checkbox NOT DONE items from yesterday.`;
 
     const userPrompt = `Here is my entry from the previous workday:
 
 Accomplishments: ${entry.accomplishments || "None recorded"}
 Pending Tasks: ${entry.pending_tasks || "None recorded"}
 Blockers: ${entry.blockers || "None recorded"}
-Notes: ${entry.notes || "None recorded"}${completedContext}${carryoverContext}
+Notes: ${entry.notes || "None recorded"}${completedContext}${exclusionContext}${carryoverContext}
 
 What are my tasks for today?`;
 
