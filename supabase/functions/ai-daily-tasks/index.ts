@@ -29,16 +29,21 @@ You MUST respond with valid JSON only. No markdown, no code fences, no explanati
 {
   "sections": [
     { "title": "Completed Yesterday", "items": ["item1", "item2"] },
-    { "title": "Pending for Today", "items": ["item1"] },
+    { "title": "Pending for Today", "subsections": [
+      { "title": "Theme/Project name", "items": ["item1", "item2"] },
+      { "title": "Another theme", "items": ["item3"] }
+    ]},
     { "title": "Carryover, Blockers & Follow-ups", "items": ["item1"] }
   ]
 }
 
 Rules:
-- Each section must have a "title" and "items" array
-- Items should be concise, professional strings (no emojis)
-- Always include all three sections, even if items array is empty
-- If prior task completion status is provided, use it to inform what carries over vs what was done`;
+- "Completed Yesterday" and "Carryover, Blockers & Follow-ups" use a flat "items" array of strings.
+- "Pending for Today" MUST use "subsections" (NOT "items"). Group today's tasks into 2-5 logical subsections by project, theme, or workstream (e.g. "Data Pipeline", "Jira Integration", "Stakeholder Coordination", "Admin & Follow-ups"). Each subsection has a short "title" (2-5 words) and an "items" array.
+- If there are very few pending tasks (<=3 total), you may use a single subsection titled "General".
+- Items should be concise, professional strings (no emojis, no bullet markers).
+- Always include all three top-level sections, even if empty.
+- If prior task completion status is provided, use it to inform what carries over vs what was done.`;
 
     const userPrompt = `Here is my entry from the previous workday:
 
