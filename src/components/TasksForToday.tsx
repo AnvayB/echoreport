@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles } from "lucide-react";
+import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { isSameDay } from "date-fns";
 
 interface TaskItem {
   text: string;
@@ -30,7 +31,11 @@ const SECTION_SEPARATOR = " › ";
 const PENDING_TITLE = "Pending for Today";
 const TOP_ORDER = ["Completed Yesterday", PENDING_TITLE, "Carryover, Blockers & Follow-ups"];
 
-const TasksForToday = () => {
+interface TasksForTodayProps {
+  selectedDate?: Date;
+}
+
+const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const { user } = useAuth();
   const [sections, setSections] = useState<TaskSection[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,6 +44,13 @@ const TasksForToday = () => {
   const [newTasksText, setNewTasksText] = useState("");
   const [adding, setAdding] = useState(false);
   const todayKey = formatDateKey(new Date());
+  const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-collapse when navigating to a past/future day; auto-expand on today
+  useEffect(() => {
+    setExpanded(isViewingToday);
+  }, [isViewingToday]);
 
   // Load existing tasks from DB on mount
   useEffect(() => {
@@ -459,11 +471,24 @@ const TasksForToday = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader
+        className={!isViewingToday ? "cursor-pointer select-none" : undefined}
+        onClick={!isViewingToday ? () => setExpanded((v) => !v) : undefined}
+      >
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks for Today
+          {!isViewingToday && (
+            <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+              {expanded ? (
+                <>Hide <ChevronUp className="h-3.5 w-3.5" /></>
+              ) : (
+                <>Show <ChevronDown className="h-3.5 w-3.5" /></>
+              )}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
+      {expanded && (
       <CardContent>
         {!sections && !loading && (
           <Button onClick={fetchTasks} variant="outline" className="w-full">
@@ -537,6 +562,7 @@ const TasksForToday = () => {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   );
 };

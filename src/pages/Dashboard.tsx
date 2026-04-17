@@ -83,7 +83,7 @@ const Dashboard = () => {
 
           {/* Column 2: Tasks for Today + Daily Entry */}
           <div className="space-y-6">
-            <TasksForToday />
+            <TasksForToday selectedDate={selectedDay} />
             <DailyEntryPanel
               date={selectedDay}
               onSaved={loadEntries}
