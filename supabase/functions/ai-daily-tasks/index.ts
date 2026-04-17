@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { entry, completed_tasks, incomplete_carryover } = await req.json();
+    const { entry, completed_tasks, incomplete_carryover, completed_exclusion } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -20,6 +20,12 @@ serve(async (req) => {
         completed_tasks.map((t: { task_text: string; completed: boolean; section: string }) =>
           `- [${t.completed ? "DONE" : "NOT DONE"}] (${t.section}) ${t.task_text}`
         ).join("\n");
+    }
+
+    let exclusionContext = "";
+    if (completed_exclusion && completed_exclusion.length > 0) {
+      exclusionContext = "\n\nEXCLUSION LIST — these tasks were explicitly COMPLETED yesterday (via checkbox). They MUST appear ONLY in 'Completed Yesterday' and MUST NOT appear in 'Pending for Today' or 'Carryover', even if the EOD Pending text mentions them:\n" +
+        completed_exclusion.map((t: string) => `- ${t}`).join("\n");
     }
 
     let carryoverContext = "";
