@@ -14,10 +14,21 @@ interface TaskItem {
   completed: boolean;
 }
 
-interface TaskSection {
+interface SubSection {
   title: string;
   items: TaskItem[];
 }
+
+interface TaskSection {
+  title: string;
+  // Either flat items OR grouped subsections (Pending for Today uses subsections)
+  items?: TaskItem[];
+  subsections?: SubSection[];
+}
+
+const SECTION_SEPARATOR = " › ";
+const PENDING_TITLE = "Pending for Today";
+const TOP_ORDER = ["Completed Yesterday", PENDING_TITLE, "Carryover, Blockers & Follow-ups"];
 
 const TasksForToday = () => {
   const { user } = useAuth();
@@ -39,25 +50,38 @@ const TasksForToday = () => {
         .eq("user_id", user.id)
         .eq("task_date", todayKey);
 
-      if (data && data.length > 0) {
-        const sectionMap = new Map<string, TaskItem[]>();
-        data.forEach((row) => {
-          if (!sectionMap.has(row.section)) sectionMap.set(row.section, []);
-          sectionMap.get(row.section)!.push({ text: row.task_text, completed: row.completed });
-        });
-        const restored: TaskSection[] = [];
-        // Maintain consistent order
-        const order = ["Completed Yesterday", "Pending for Today", "Carryover, Blockers & Follow-ups"];
-        order.forEach((title) => {
-          if (sectionMap.has(title)) {
-            restored.push({ title, items: sectionMap.get(title)! });
-            sectionMap.delete(title);
-          }
-        });
-        // Any remaining sections
-        sectionMap.forEach((items, title) => restored.push({ title, items }));
-        setSections(restored);
-      }
+      if (!data || data.length === 0) return;
+
+      // Group rows by top-level section, preserving subsection structure if present
+      const topMap = new Map<string, Map<string | null, TaskItem[]>>();
+      data.forEach((row) => {
+        const [top, sub = null] = row.section.split(SECTION_SEPARATOR);
+        if (!topMap.has(top)) topMap.set(top, new Map());
+        const subMap = topMap.get(top)!;
+        const key = sub;
+        if (!subMap.has(key)) subMap.set(key, []);
+        subMap.get(key)!.push({ text: row.task_text, completed: row.completed });
+      });
+
+      const restored: TaskSection[] = [];
+      const visit = (top: string) => {
+        if (!topMap.has(top)) return;
+        const subMap = topMap.get(top)!;
+        const hasSubs = Array.from(subMap.keys()).some((k) => k !== null);
+        if (hasSubs) {
+          const subsections: SubSection[] = [];
+          subMap.forEach((items, subTitle) => {
+            subsections.push({ title: subTitle ?? "General", items });
+          });
+          restored.push({ title: top, subsections });
+        } else {
+          restored.push({ title: top, items: subMap.get(null) ?? [] });
+        }
+        topMap.delete(top);
+      };
+      TOP_ORDER.forEach(visit);
+      topMap.forEach((_subMap, top) => visit(top));
+      setSections(restored);
     };
     loadExisting();
   }, [user, todayKey]);
@@ -69,7 +93,6 @@ const TasksForToday = () => {
     const prevDay = getPreviousWorkday(new Date());
     const prevKey = formatDateKey(prevDay);
 
-    // Fetch previous day's entry and completed tasks in parallel
     const [entryRes, tasksRes] = await Promise.all([
       supabase
         .from("daily_entries")
@@ -100,15 +123,24 @@ const TasksForToday = () => {
       if (error) throw error;
 
       if (data.sections) {
-        const parsed: TaskSection[] = data.sections.map((s: { title: string; items: string[] }) => ({
-          title: s.title,
-          items: s.items.map((text: string) => ({ text, completed: false })),
-        }));
+        const parsed: TaskSection[] = data.sections.map((s: { title: string; items?: string[]; subsections?: { title: string; items: string[] }[] }) => {
+          if (s.subsections && Array.isArray(s.subsections)) {
+            return {
+              title: s.title,
+              subsections: s.subsections.map((sub) => ({
+                title: sub.title,
+                items: (sub.items || []).map((text) => ({ text, completed: false })),
+              })),
+            };
+          }
+          return {
+            title: s.title,
+            items: (s.items || []).map((text) => ({ text, completed: false })),
+          };
+        });
         setSections(parsed);
-        // Persist to DB
         await persistTasks(parsed);
       } else if (data.summary) {
-        // Fallback for markdown response
         setSections([{ title: "Tasks", items: [{ text: data.summary, completed: false }] }]);
       }
     } catch (e) {
@@ -119,51 +151,102 @@ const TasksForToday = () => {
     }
   };
 
+  const sectionKeyFor = (top: string, sub?: string | null) =>
+    sub ? `${top}${SECTION_SEPARATOR}${sub}` : top;
+
   const persistTasks = async (taskSections: TaskSection[]) => {
     if (!user) return;
-    // Delete existing tasks for today, then insert new ones
     await supabase.from("daily_tasks").delete().eq("user_id", user.id).eq("task_date", todayKey);
 
-    const rows = taskSections.flatMap((section) =>
-      section.items.map((item) => ({
-        user_id: user.id,
-        task_date: todayKey,
-        section: section.title,
-        task_text: item.text,
-        completed: item.completed,
-      }))
-    );
+    const rows: Array<{ user_id: string; task_date: string; section: string; task_text: string; completed: boolean }> = [];
+    taskSections.forEach((section) => {
+      if (section.subsections) {
+        section.subsections.forEach((sub) => {
+          sub.items.forEach((item) => {
+            rows.push({
+              user_id: user.id,
+              task_date: todayKey,
+              section: sectionKeyFor(section.title, sub.title),
+              task_text: item.text,
+              completed: item.completed,
+            });
+          });
+        });
+      } else if (section.items) {
+        section.items.forEach((item) => {
+          rows.push({
+            user_id: user.id,
+            task_date: todayKey,
+            section: section.title,
+            task_text: item.text,
+            completed: item.completed,
+          });
+        });
+      }
+    });
     if (rows.length > 0) {
       await supabase.from("daily_tasks").insert(rows);
     }
   };
 
-  const toggleTask = async (sectionIdx: number, itemIdx: number) => {
+  const toggleTaskAt = async (
+    sectionIdx: number,
+    subIdx: number | null,
+    itemIdx: number,
+  ) => {
     if (!sections || !user) return;
+
     const updated = sections.map((section, si) => {
       if (si !== sectionIdx) return section;
-      return {
-        ...section,
-        items: section.items.map((item, ii) => {
-          if (ii !== itemIdx) return item;
-          return { ...item, completed: !item.completed };
-        }),
-      };
+      if (subIdx !== null && section.subsections) {
+        return {
+          ...section,
+          subsections: section.subsections.map((sub, sj) => {
+            if (sj !== subIdx) return sub;
+            return {
+              ...sub,
+              items: sub.items.map((item, ii) =>
+                ii === itemIdx ? { ...item, completed: !item.completed } : item
+              ),
+            };
+          }),
+        };
+      }
+      if (subIdx === null && section.items) {
+        return {
+          ...section,
+          items: section.items.map((item, ii) =>
+            ii === itemIdx ? { ...item, completed: !item.completed } : item
+          ),
+        };
+      }
+      return section;
     });
     setSections(updated);
 
-    const task = updated[sectionIdx].items[itemIdx];
-    const key = `${sectionIdx}-${itemIdx}`;
+    const targetSection = updated[sectionIdx];
+    let task: TaskItem;
+    let dbSection: string;
+    if (subIdx !== null && targetSection.subsections) {
+      task = targetSection.subsections[subIdx].items[itemIdx];
+      dbSection = sectionKeyFor(targetSection.title, targetSection.subsections[subIdx].title);
+    } else if (targetSection.items) {
+      task = targetSection.items[itemIdx];
+      dbSection = targetSection.title;
+    } else {
+      return;
+    }
+
+    const key = `${sectionIdx}-${subIdx ?? "x"}-${itemIdx}`;
     setSavingKey(key);
 
-    // Update in DB
     const { data: existing } = await supabase
       .from("daily_tasks")
       .select("id")
       .eq("user_id", user.id)
       .eq("task_date", todayKey)
       .eq("task_text", task.text)
-      .eq("section", updated[sectionIdx].title)
+      .eq("section", dbSection)
       .maybeSingle();
 
     if (existing) {
@@ -206,24 +289,49 @@ const TasksForToday = () => {
         return;
       }
 
-      const targetTitle = "Pending for Today";
       const current = sections ?? [];
-      const hasTarget = current.some((s) => s.title === targetTitle);
       const newItems: TaskItem[] = items.map((t) => ({ text: t, completed: false }));
+      const ADDED_SUB_TITLE = "Added Manually";
 
-      const updated: TaskSection[] = hasTarget
-        ? current.map((s) =>
-            s.title === targetTitle ? { ...s, items: [...s.items, ...newItems] } : s
-          )
-        : [...current, { title: targetTitle, items: newItems }];
+      let updated: TaskSection[];
+      const pendingIdx = current.findIndex((s) => s.title === PENDING_TITLE);
+
+      if (pendingIdx === -1) {
+        updated = [
+          ...current,
+          { title: PENDING_TITLE, subsections: [{ title: ADDED_SUB_TITLE, items: newItems }] },
+        ];
+      } else {
+        const pending = current[pendingIdx];
+        let newPending: TaskSection;
+        if (pending.subsections) {
+          const existingSubIdx = pending.subsections.findIndex((s) => s.title === ADDED_SUB_TITLE);
+          const newSubs = existingSubIdx >= 0
+            ? pending.subsections.map((s, i) =>
+                i === existingSubIdx ? { ...s, items: [...s.items, ...newItems] } : s
+              )
+            : [...pending.subsections, { title: ADDED_SUB_TITLE, items: newItems }];
+          newPending = { ...pending, subsections: newSubs };
+        } else {
+          // Convert flat to subsections
+          const existingItems = pending.items ?? [];
+          newPending = {
+            title: PENDING_TITLE,
+            subsections: [
+              ...(existingItems.length ? [{ title: "General", items: existingItems }] : []),
+              { title: ADDED_SUB_TITLE, items: newItems },
+            ],
+          };
+        }
+        updated = current.map((s, i) => (i === pendingIdx ? newPending : s));
+      }
 
       setSections(updated);
 
-      // Persist only the new rows (avoid wiping completion state of existing tasks)
       const rows = newItems.map((item) => ({
         user_id: user.id,
         task_date: todayKey,
-        section: targetTitle,
+        section: sectionKeyFor(PENDING_TITLE, ADDED_SUB_TITLE),
         task_text: item.text,
         completed: item.completed,
       }));
@@ -238,6 +346,52 @@ const TasksForToday = () => {
     } finally {
       setAdding(false);
     }
+  };
+
+  // Render a single task row (checkbox or completed-yesterday icon)
+  const renderTaskRow = (
+    item: TaskItem,
+    sectionTitle: string,
+    sectionIdx: number,
+    subIdx: number | null,
+    itemIdx: number,
+  ) => {
+    if (sectionTitle === "Completed Yesterday") {
+      return (
+        <div key={itemIdx} className="flex items-start gap-2">
+          <CircleCheckBig className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+          <span className="text-sm leading-snug text-muted-foreground">{item.text}</span>
+        </div>
+      );
+    }
+    const key = `${sectionIdx}-${subIdx ?? "x"}-${itemIdx}`;
+    const isSaving = savingKey === key;
+    const isSaved = savedKey === key;
+    return (
+      <label key={itemIdx} className="flex items-start gap-2 cursor-pointer group">
+        <Checkbox
+          checked={item.completed}
+          onCheckedChange={() => toggleTaskAt(sectionIdx, subIdx, itemIdx)}
+          className="mt-0.5"
+          disabled={isSaving}
+        />
+        <span
+          className={`text-sm leading-snug transition-all flex-1 ${
+            item.completed ? "line-through text-muted-foreground" : "text-foreground"
+          }`}
+        >
+          {item.text}
+        </span>
+        {isSaving && (
+          <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
+        )}
+        {isSaved && !isSaving && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
+            <Check className="h-3 w-3" /> Saved
+          </span>
+        )}
+      </label>
+    );
   };
 
   return (
@@ -259,56 +413,32 @@ const TasksForToday = () => {
           </div>
         )}
         {sections && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {sections.map((section, si) => (
               <div key={si}>
                 <p className="font-semibold text-sm text-foreground mb-2">{section.title}</p>
-                <div className="space-y-1.5">
-                  {section.items.map((item, ii) => (
-                    section.title === "Completed Yesterday" ? (
-                      <div key={ii} className="flex items-start gap-2">
-                        <CircleCheckBig className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <span className="text-sm leading-snug text-muted-foreground">{item.text}</span>
+                {section.subsections ? (
+                  <div className="space-y-3">
+                    {section.subsections.map((sub, sj) => (
+                      <div key={sj} className="pl-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                          {sub.title}
+                        </p>
+                        <div className="space-y-1.5">
+                          {sub.items.map((item, ii) =>
+                            renderTaskRow(item, section.title, si, sj, ii)
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      (() => {
-                        const key = `${si}-${ii}`;
-                        const isSaving = savingKey === key;
-                        const isSaved = savedKey === key;
-                        return (
-                          <label
-                            key={ii}
-                            className="flex items-start gap-2 cursor-pointer group"
-                          >
-                            <Checkbox
-                              checked={item.completed}
-                              onCheckedChange={() => toggleTask(si, ii)}
-                              className="mt-0.5"
-                              disabled={isSaving}
-                            />
-                            <span
-                              className={`text-sm leading-snug transition-all flex-1 ${
-                                item.completed
-                                  ? "line-through text-muted-foreground"
-                                  : "text-foreground"
-                              }`}
-                            >
-                              {item.text}
-                            </span>
-                            {isSaving && (
-                              <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
-                            )}
-                            {isSaved && !isSaving && (
-                              <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
-                                <Check className="h-3 w-3" /> Saved
-                              </span>
-                            )}
-                          </label>
-                        );
-                      })()
-                    )
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(section.items ?? []).map((item, ii) =>
+                      renderTaskRow(item, section.title, si, null, ii)
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
