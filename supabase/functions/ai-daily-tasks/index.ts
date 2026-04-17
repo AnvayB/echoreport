@@ -62,7 +62,7 @@ CRITICAL CARRYOVER RULES:
 Accomplishments: ${entry.accomplishments || "None recorded"}
 Pending Tasks: ${entry.pending_tasks || "None recorded"}
 Blockers: ${entry.blockers || "None recorded"}
-Notes: ${entry.notes || "None recorded"}${completedContext}
+Notes: ${entry.notes || "None recorded"}${completedContext}${carryoverContext}
 
 What are my tasks for today?`;
 
