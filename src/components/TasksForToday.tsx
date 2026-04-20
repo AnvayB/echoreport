@@ -184,9 +184,11 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
       return;
     }
 
-    // Dedupe carryover by task_text, keep oldest date
+    // Dedupe carryover by task_text, keep oldest date, and exclude already-completed items
     const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
     carryoverData.forEach((r) => {
+      // Skip carryover items that match the global completed-exclusion set
+      if (completedExclusionSet.has(norm(r.task_text))) return;
       const existing = carryoverMap.get(r.task_text);
       if (!existing || r.task_date < existing.task_date) {
         carryoverMap.set(r.task_text, r);
