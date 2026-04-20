@@ -27,9 +27,19 @@ interface TaskSection {
   subsections?: SubSection[];
 }
 
+interface TaskTextRow {
+  task_text: string;
+}
+
+interface CurrentTaskRow extends TaskTextRow {
+  completed: boolean;
+}
+
 const SECTION_SEPARATOR = " › ";
 const PENDING_TITLE = "Pending for Today";
 const TOP_ORDER = ["Completed Yesterday", PENDING_TITLE, "Carryover, Blockers & Follow-ups"];
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 interface TasksForTodayProps {
   selectedDate?: Date;
@@ -47,6 +57,40 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
   const [expanded, setExpanded] = useState(true);
 
+  const buildCompletedExclusion = async (
+    accomplishmentsText: string,
+    historicalCompleted: TaskTextRow[],
+    currentTasks: CurrentTaskRow[],
+  ) => {
+    const completedExclusionSet = new Set<string>();
+    const completedExclusionDisplay: string[] = [];
+
+    const addToExclusion = (text: string) => {
+      const key = norm(text);
+      if (!key || completedExclusionSet.has(key)) return;
+      completedExclusionSet.add(key);
+      completedExclusionDisplay.push(text);
+    };
+
+    historicalCompleted.forEach((task) => addToExclusion(task.task_text));
+    currentTasks.filter((task) => task.completed).forEach((task) => addToExclusion(task.task_text));
+
+    if (accomplishmentsText.trim()) {
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
+          body: { text: accomplishmentsText },
+        });
+        if (error) throw error;
+        const accomplishmentItems: string[] = Array.isArray(data?.items) ? data.items : [];
+        accomplishmentItems.forEach(addToExclusion);
+      } catch (e) {
+        console.error("Accomplishment exclusion parse failed:", e);
+      }
+    }
+
+    return { completedExclusionSet, completedExclusionDisplay };
+  };
+
   // Auto-collapse when navigating to a past/future day; auto-expand on today
   useEffect(() => {
     setExpanded(isViewingToday);
@@ -56,13 +100,41 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   useEffect(() => {
     if (!user) return;
     const loadExisting = async () => {
-      const { data } = await supabase
-        .from("daily_tasks")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("task_date", todayKey);
+      const prevKey = formatDateKey(getPreviousWorkday(new Date()));
+      const [todayRes, prevEntryRes, everCompletedRes] = await Promise.all([
+        supabase
+          .from("daily_tasks")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("task_date", todayKey),
+        supabase
+          .from("daily_entries")
+          .select("accomplishments")
+          .eq("user_id", user.id)
+          .eq("entry_date", prevKey)
+          .maybeSingle(),
+        supabase
+          .from("daily_tasks")
+          .select("task_text")
+          .eq("user_id", user.id)
+          .eq("completed", true)
+          .lte("task_date", todayKey),
+      ]);
 
-      if (!data || data.length === 0) return;
+      const { completedExclusionSet } = await buildCompletedExclusion(
+        prevEntryRes.data?.accomplishments || "",
+        everCompletedRes.data || [],
+        (todayRes.data || []).map((row) => ({ task_text: row.task_text, completed: row.completed })),
+      );
+
+      const data = (todayRes.data || []).filter((row) => (
+        row.section === "Completed Yesterday" || !completedExclusionSet.has(norm(row.task_text))
+      ));
+
+      if (data.length === 0) {
+        setSections(null);
+        return;
+      }
 
       // Group rows by top-level section, preserving subsection structure if present
       const topMap = new Map<string, Map<string | null, TaskItem[]>>();
@@ -117,22 +189,18 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .select("task_text, completed, section, task_date")
         .eq("user_id", user.id)
         .eq("task_date", prevKey),
-      // All unchecked tasks from any prior day (carryover candidates)
       supabase
         .from("daily_tasks")
         .select("task_text, section, task_date")
         .eq("user_id", user.id)
         .eq("completed", false)
         .lt("task_date", todayKey),
-      // Every task EVER completed (any past day) — used as a global exclusion
-      // list so re-completed work cannot leak back into today's pending.
       supabase
         .from("daily_tasks")
         .select("task_text")
         .eq("user_id", user.id)
         .eq("completed", true)
         .lte("task_date", todayKey),
-      // Today's existing rows — preserves checked state when regenerating.
       supabase
         .from("daily_tasks")
         .select("task_text, completed")
@@ -140,9 +208,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .eq("task_date", todayKey),
     ]);
 
-    // Backfill safety net: if yesterday has an entry but ZERO daily_tasks rows,
-    // retroactively parse the EOD pending_tasks into daily_tasks rows so they
-    // can be carried over and reconciled.
     let prevTasks = prevTasksRes.data || [];
     let carryoverData = incompletePastRes.data || [];
     if (entryRes.data && prevTasks.length === 0 && (entryRes.data.pending_tasks || "").trim()) {
@@ -167,7 +232,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
             section: r.section,
             task_date: r.task_date,
           }));
-          // Merge into carryover candidates too
           carryoverData = [
             ...carryoverData,
             ...seedRows.map((r) => ({ task_text: r.task_text, section: r.section, task_date: r.task_date })),
@@ -184,34 +248,18 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
       return;
     }
 
-    // Normalize text for fuzzy matching (case/whitespace/punctuation-insensitive)
-    const norm = (s: string) =>
-      s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const { completedExclusionSet, completedExclusionDisplay } = await buildCompletedExclusion(
+      entryRes.data?.accomplishments || "",
+      everCompletedRes.data || [],
+      todayTasksRes.data || [],
+    );
 
-    // Build exclusion list: every task ever completed (any day, including today's
-    // already-checked items). This prevents re-completed work from leaking back
-    // into today's pending list, even when the EOD prose still mentions it.
-    const completedExclusionSet = new Set<string>();
-    const completedExclusionDisplay: string[] = [];
-    [
-      ...(everCompletedRes.data || []),
-      ...(todayTasksRes.data || []).filter((t) => t.completed),
-    ].forEach((t) => {
-      const k = norm(t.task_text);
-      if (k && !completedExclusionSet.has(k)) {
-        completedExclusionSet.add(k);
-        completedExclusionDisplay.push(t.task_text);
-      }
-    });
-
-    // Map of normalized text -> completed state, used to preserve checks across regenerate.
     const completedByText = new Map<string, boolean>();
     (todayTasksRes.data || []).forEach((t) => {
       completedByText.set(norm(t.task_text), t.completed);
     });
-    completedExclusionSet.forEach((k) => completedByText.set(k, true));
+    completedExclusionSet.forEach((key) => completedByText.set(key, true));
 
-    // Dedupe carryover by task_text, keep oldest date, and exclude already-completed items
     const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
     carryoverData.forEach((r) => {
       if (completedExclusionSet.has(norm(r.task_text))) return;
@@ -242,7 +290,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
               title: s.title,
               subsections: s.subsections.map((sub) => ({
                 title: sub.title,
-                // Drop any item that matches the global completed-exclusion set
                 items: (sub.items || [])
                   .filter((text) => !completedExclusionSet.has(norm(text)))
                   .map((text) => ({ text, completed: restoreCompleted(text) })),
@@ -252,7 +299,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
           return {
             title: s.title,
             items: (s.items || [])
-              // Keep completed items inside "Completed Yesterday"; filter elsewhere
               .filter((text) =>
                 s.title === "Completed Yesterday" ? true : !completedExclusionSet.has(norm(text))
               )
