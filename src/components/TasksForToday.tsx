@@ -184,16 +184,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
       return;
     }
 
-    // Dedupe carryover by task_text, keep oldest date
-    const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
-    carryoverData.forEach((r) => {
-      const existing = carryoverMap.get(r.task_text);
-      if (!existing || r.task_date < existing.task_date) {
-        carryoverMap.set(r.task_text, r);
-      }
-    });
-    const carryover = Array.from(carryoverMap.values());
-
     // Normalize text for fuzzy matching (case/whitespace/punctuation-insensitive)
     const norm = (s: string) =>
       s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -220,6 +210,17 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
       completedByText.set(norm(t.task_text), t.completed);
     });
     completedExclusionSet.forEach((k) => completedByText.set(k, true));
+
+    // Dedupe carryover by task_text, keep oldest date, and exclude already-completed items
+    const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
+    carryoverData.forEach((r) => {
+      if (completedExclusionSet.has(norm(r.task_text))) return;
+      const existing = carryoverMap.get(r.task_text);
+      if (!existing || r.task_date < existing.task_date) {
+        carryoverMap.set(r.task_text, r);
+      }
+    });
+    const carryover = Array.from(carryoverMap.values());
 
     try {
       const { data, error } = await supabase.functions.invoke("ai-daily-tasks", {
