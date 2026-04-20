@@ -24,7 +24,7 @@ serve(async (req) => {
 
     let exclusionContext = "";
     if (completed_exclusion && completed_exclusion.length > 0) {
-      exclusionContext = "\n\nEXCLUSION LIST — these tasks were explicitly COMPLETED yesterday (via checkbox). They MUST appear ONLY in 'Completed Yesterday' and MUST NOT appear in 'Pending for Today' or 'Carryover', even if the EOD Pending text mentions them:\n" +
+      exclusionContext = "\n\nGLOBAL EXCLUSION LIST — these tasks have ALREADY been completed at some point (today or any previous day). They MUST NOT appear in 'Pending for Today' or 'Carryover' under ANY circumstances, even if the EOD Pending text mentions them, even if the wording differs slightly. Match loosely (case/whitespace/punctuation-insensitive, paraphrases count). It is OK to omit them from 'Completed Yesterday' too if they were completed before yesterday — only list yesterday's completions there.\n" +
         completed_exclusion.map((t: string) => `- ${t}`).join("\n");
     }
 

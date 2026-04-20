@@ -105,7 +105,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     const prevDay = getPreviousWorkday(new Date());
     const prevKey = formatDateKey(prevDay);
 
-    const [entryRes, prevTasksRes, incompletePastRes] = await Promise.all([
+    const [entryRes, prevTasksRes, incompletePastRes, everCompletedRes, todayTasksRes] = await Promise.all([
       supabase
         .from("daily_entries")
         .select("*")
@@ -124,6 +124,20 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .eq("user_id", user.id)
         .eq("completed", false)
         .lt("task_date", todayKey),
+      // Every task EVER completed (any past day) — used as a global exclusion
+      // list so re-completed work cannot leak back into today's pending.
+      supabase
+        .from("daily_tasks")
+        .select("task_text")
+        .eq("user_id", user.id)
+        .eq("completed", true)
+        .lte("task_date", todayKey),
+      // Today's existing rows — preserves checked state when regenerating.
+      supabase
+        .from("daily_tasks")
+        .select("task_text, completed")
+        .eq("user_id", user.id)
+        .eq("task_date", todayKey),
     ]);
 
     // Backfill safety net: if yesterday has an entry but ZERO daily_tasks rows,
@@ -180,11 +194,32 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     });
     const carryover = Array.from(carryoverMap.values());
 
-    // Build exclusion list: tasks explicitly completed yesterday — these MUST NOT
-    // appear as pending today even if the EOD prose mentions them.
-    const completedExclusion = prevTasks
-      .filter((t) => t.completed)
-      .map((t) => t.task_text);
+    // Normalize text for fuzzy matching (case/whitespace/punctuation-insensitive)
+    const norm = (s: string) =>
+      s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+    // Build exclusion list: every task ever completed (any day, including today's
+    // already-checked items). This prevents re-completed work from leaking back
+    // into today's pending list, even when the EOD prose still mentions it.
+    const completedExclusionSet = new Set<string>();
+    const completedExclusionDisplay: string[] = [];
+    [
+      ...(everCompletedRes.data || []),
+      ...(todayTasksRes.data || []).filter((t) => t.completed),
+    ].forEach((t) => {
+      const k = norm(t.task_text);
+      if (k && !completedExclusionSet.has(k)) {
+        completedExclusionSet.add(k);
+        completedExclusionDisplay.push(t.task_text);
+      }
+    });
+
+    // Map of normalized text -> completed state, used to preserve checks across regenerate.
+    const completedByText = new Map<string, boolean>();
+    (todayTasksRes.data || []).forEach((t) => {
+      completedByText.set(norm(t.task_text), t.completed);
+    });
+    completedExclusionSet.forEach((k) => completedByText.set(k, true));
 
     try {
       const { data, error } = await supabase.functions.invoke("ai-daily-tasks", {
@@ -192,25 +227,35 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
           entry: entryRes.data || { accomplishments: "", pending_tasks: "", blockers: "", notes: "" },
           completed_tasks: prevTasks,
           incomplete_carryover: carryover,
-          completed_exclusion: completedExclusion,
+          completed_exclusion: completedExclusionDisplay,
         },
       });
       if (error) throw error;
 
       if (data.sections) {
         const parsed: TaskSection[] = data.sections.map((s: { title: string; items?: string[]; subsections?: { title: string; items: string[] }[] }) => {
+          const restoreCompleted = (text: string) =>
+            s.title === "Completed Yesterday" ? true : (completedByText.get(norm(text)) ?? false);
           if (s.subsections && Array.isArray(s.subsections)) {
             return {
               title: s.title,
               subsections: s.subsections.map((sub) => ({
                 title: sub.title,
-                items: (sub.items || []).map((text) => ({ text, completed: false })),
-              })),
+                // Drop any item that matches the global completed-exclusion set
+                items: (sub.items || [])
+                  .filter((text) => !completedExclusionSet.has(norm(text)))
+                  .map((text) => ({ text, completed: restoreCompleted(text) })),
+              })).filter((sub) => sub.items.length > 0),
             };
           }
           return {
             title: s.title,
-            items: (s.items || []).map((text) => ({ text, completed: false })),
+            items: (s.items || [])
+              // Keep completed items inside "Completed Yesterday"; filter elsewhere
+              .filter((text) =>
+                s.title === "Completed Yesterday" ? true : !completedExclusionSet.has(norm(text))
+              )
+              .map((text) => ({ text, completed: restoreCompleted(text) })),
           };
         });
         setSections(parsed);
