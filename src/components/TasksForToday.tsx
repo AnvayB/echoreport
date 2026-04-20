@@ -105,7 +105,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     const prevDay = getPreviousWorkday(new Date());
     const prevKey = formatDateKey(prevDay);
 
-    const [entryRes, prevTasksRes, incompletePastRes] = await Promise.all([
+    const [entryRes, prevTasksRes, incompletePastRes, everCompletedRes, todayTasksRes] = await Promise.all([
       supabase
         .from("daily_entries")
         .select("*")
@@ -124,6 +124,20 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .eq("user_id", user.id)
         .eq("completed", false)
         .lt("task_date", todayKey),
+      // Every task EVER completed (any past day) — used as a global exclusion
+      // list so re-completed work cannot leak back into today's pending.
+      supabase
+        .from("daily_tasks")
+        .select("task_text")
+        .eq("user_id", user.id)
+        .eq("completed", true)
+        .lte("task_date", todayKey),
+      // Today's existing rows — preserves checked state when regenerating.
+      supabase
+        .from("daily_tasks")
+        .select("task_text, completed")
+        .eq("user_id", user.id)
+        .eq("task_date", todayKey),
     ]);
 
     // Backfill safety net: if yesterday has an entry but ZERO daily_tasks rows,
