@@ -1,53 +1,18 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
 import { dedupeTaskTexts, mergeDuplicateTaskRows } from "@/lib/taskUtils";
 import { toast } from "sonner";
 import { isSameDay } from "date-fns";
+import {
+  TasksForTodayContext,
+  type TaskRow,
+  type TaskGroup,
+} from "./TasksForTodayContext";
 
-export interface TaskRow {
-  id: string;
-  task_text: string;
-  completed: boolean;
-  section: string;
-  task_date: string;
-}
-
-export interface TaskGroup {
-  title: string;
-  rows: TaskRow[];
-}
-
-interface TasksForTodayContextValue {
-  selectedDate: Date;
-  todayKey: string;
-  isViewingToday: boolean;
-  loading: boolean;
-  loaded: boolean;
-  completedYesterday: TaskRow[];
-  completedToday: TaskRow[];
-  pending: TaskRow[];
-  blockers: TaskRow[];
-  pendingGroups: TaskGroup[] | null;
-  grouping: boolean;
-  savingId: string | null;
-  savedId: string | null;
-  newTasksText: string;
-  setNewTasksText: (v: string) => void;
-  adding: boolean;
-  toggleTask: (row: TaskRow) => Promise<void>;
-  addMoreTasks: () => Promise<void>;
-  reload: () => Promise<void>;
-}
-
-const TasksForTodayContext = createContext<TasksForTodayContextValue | null>(null);
-
-export const useTasksForToday = () => {
-  const ctx = useContext(TasksForTodayContext);
-  if (!ctx) throw new Error("useTasksForToday must be used within TasksForTodayProvider");
-  return ctx;
-};
+export { useTasksForToday } from "./TasksForTodayContext";
+export type { TaskRow, TaskGroup } from "./TasksForTodayContext";
 
 interface ProviderProps {
   selectedDate?: Date;
