@@ -21,11 +21,9 @@ const WeekDayCard = ({ date, hasEntry, isToday, isSelected, onClick }: WeekDayCa
       )}
       onClick={onClick}
     >
-      <CardContent className="flex items-center justify-between px-3 py-2.5">
-        <div>
-          <p className="text-sm font-medium">{format(date, "EEE")}</p>
-          <p className="text-xs text-muted-foreground">{format(date, "MMM d")}</p>
-        </div>
+      <CardContent className="flex flex-col items-center gap-1 px-3 py-2.5">
+        <p className="text-sm font-medium">{format(date, "EEE")}</p>
+        <p className="text-xs text-muted-foreground">{format(date, "MMM d")}</p>
         {hasEntry ? (
           <CheckCircle className="h-4 w-4 text-primary" />
         ) : (
