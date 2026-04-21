@@ -54,44 +54,41 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl p-4">
+      <main className="mx-auto max-w-7xl p-4 space-y-6">
+        {/* Horizontal weekly calendar */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, -1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h2 className="text-sm font-medium">{formatWeekLabel(currentWeek)}</h2>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {weekdays.map((day) => (
+              <WeekDayCard
+                key={formatDateKey(day)}
+                date={day}
+                hasEntry={entryDates.has(formatDateKey(day))}
+                isToday={isSameDay(day, today)}
+                isSelected={isSameDay(day, selectedDay)}
+                onClick={() => setSelectedDay(day)}
+              />
+            ))}
+          </div>
+        </div>
+
         <TasksForTodayProvider selectedDate={selectedDay}>
-          <div className="grid gap-6 lg:grid-cols-[280px_1fr_1fr] md:grid-cols-[240px_1fr]">
-            {/* Column 1: Calendar + Completed Yesterday */}
+          <div className="grid gap-6 lg:grid-cols-3 md:grid-cols-2">
             <div className="space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, -1))}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <h2 className="text-sm font-medium">{formatWeekLabel(currentWeek)}</h2>
-                  <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(navigateWeek(currentWeek, 1))}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-1.5">
-                  {weekdays.map((day) => (
-                    <WeekDayCard
-                      key={formatDateKey(day)}
-                      date={day}
-                      hasEntry={entryDates.has(formatDateKey(day))}
-                      isToday={isSameDay(day, today)}
-                      isSelected={isSameDay(day, selectedDay)}
-                      onClick={() => setSelectedDay(day)}
-                    />
-                  ))}
-                </div>
-              </div>
               <TasksForToday section="completedYesterday" />
             </div>
-
-            {/* Column 2: Tasks for Today (pending) + Daily Entry */}
             <div className="space-y-6">
               <TasksForToday section="pending" />
               <DailyEntryPanel date={selectedDay} onSaved={loadEntries} />
             </div>
-
-            {/* Column 3: Weekly Report + Completed Today */}
             <div className="space-y-6 md:col-span-2 lg:col-span-1">
               <WeeklyReportGenerator currentWeek={currentWeek} />
               <TasksForToday section="completedToday" />
