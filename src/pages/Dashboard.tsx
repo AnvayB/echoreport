@@ -41,7 +41,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
           <h1 className="text-xl font-bold">Echo Report</h1>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
