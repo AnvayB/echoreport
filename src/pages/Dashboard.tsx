@@ -41,7 +41,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
           <h1 className="text-xl font-bold">Echo Report</h1>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
@@ -54,9 +54,9 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl p-4">
+      <main className="mx-auto max-w-[1600px] p-4">
         <TasksForTodayProvider selectedDate={selectedDay}>
-          <div className="grid gap-6 lg:grid-cols-3 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[1fr_1.6fr_1fr]">
             {/* Column 1: Horizontal calendar + Completed Yesterday */}
             <div className="space-y-6">
               <div className="space-y-3">
