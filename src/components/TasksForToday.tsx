@@ -34,6 +34,7 @@ interface TaskGroup {
 const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const { user } = useAuth();
   const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
+  const [completedToday, setCompletedToday] = useState<TaskRow[]>([]);
   const [pending, setPending] = useState<TaskRow[]>([]);
   const [blockers, setBlockers] = useState<TaskRow[]>([]);
   const [pendingGroups, setPendingGroups] = useState<TaskGroup[] | null>(null);
@@ -59,7 +60,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     setLoading(true);
     const prevKey = formatDateKey(getPreviousWorkday(today));
 
-    const [completedRes, pendingRes, blockerRes] = await Promise.all([
+    const [completedRes, pendingRes, blockerRes, completedTodayRes] = await Promise.all([
       supabase
         .from("daily_tasks")
         .select("*")
@@ -82,15 +83,23 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .eq("section", "blocker")
         .lte("task_date", todayKey)
         .order("task_date", { ascending: true }),
+      supabase
+        .from("daily_tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("task_date", todayKey)
+        .eq("completed", true),
     ]);
 
     const completedResult = mergeDuplicateTaskRows(completedRes.data ?? []);
     const pendingResult = mergeDuplicateTaskRows(pendingRes.data ?? []);
     const blockerResult = mergeDuplicateTaskRows(blockerRes.data ?? []);
+    const completedTodayResult = mergeDuplicateTaskRows(completedTodayRes.data ?? []);
     const duplicateIds = [
       ...completedResult.duplicateIds,
       ...pendingResult.duplicateIds,
       ...blockerResult.duplicateIds,
+      ...completedTodayResult.duplicateIds,
     ];
 
     if (duplicateIds.length > 0) {
@@ -105,6 +114,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     }
 
     setCompletedYesterday(completedResult.rows);
+    setCompletedToday(completedTodayResult.rows);
     setPending(pendingResult.rows);
     setBlockers(blockerResult.rows);
     setLoaded(true);
@@ -168,37 +178,68 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
 
   const toggleTask = async (row: TaskRow) => {
     if (!user) return;
-    const newCompleted = !row.completed;
+    const completing = !row.completed;
     setSavingId(row.id);
 
-    // Optimistic update
-    const update = (list: TaskRow[]) =>
-      list.map((r) => (r.id === row.id ? { ...r, completed: newCompleted } : r));
-    setPending(update);
-    setBlockers(update);
-
-    const { error } = await supabase
-      .from("daily_tasks")
-      .update({ completed: newCompleted })
-      .eq("id", row.id);
-    setSavingId(null);
-
-    if (error) {
-      toast.error("Couldn't save task status");
-      // Revert
-      setPending((list) => list.map((r) => (r.id === row.id ? { ...r, completed: row.completed } : r)));
-      setBlockers((list) => list.map((r) => (r.id === row.id ? { ...r, completed: row.completed } : r)));
-      return;
-    }
-
-    setSavedId(row.id);
-    setTimeout(() => setSavedId((id) => (id === row.id ? null : id)), 1200);
-
-    if (newCompleted) {
-      // Remove from current list (it'll show under Completed on its source date)
+    if (completing) {
+      // Optimistic: move from pending/blockers into completedToday
+      const updatedRow: TaskRow = {
+        ...row,
+        completed: true,
+        section: "completed:manual",
+        task_date: todayKey,
+      };
       setPending((list) => list.filter((r) => r.id !== row.id));
       setBlockers((list) => list.filter((r) => r.id !== row.id));
+      setCompletedToday((list) => [updatedRow, ...list]);
+
+      const { error } = await supabase
+        .from("daily_tasks")
+        .update({ completed: true, section: "completed:manual", task_date: todayKey })
+        .eq("id", row.id);
+      setSavingId(null);
+
+      if (error) {
+        toast.error("Couldn't save task status");
+        setCompletedToday((list) => list.filter((r) => r.id !== row.id));
+        if (row.section.startsWith("pending")) {
+          setPending((list) => [row, ...list]);
+        } else {
+          setBlockers((list) => [row, ...list]);
+        }
+        return;
+      }
+
+      setSavedId(row.id);
+      setTimeout(() => setSavedId((id) => (id === row.id ? null : id)), 1200);
       toast.success("Task complete");
+
+    } else {
+      // Optimistic: move from completedToday back to top of pending
+      const restoredRow: TaskRow = {
+        ...row,
+        completed: false,
+        section: "pending",
+        task_date: todayKey,
+      };
+      setCompletedToday((list) => list.filter((r) => r.id !== row.id));
+      setPending((list) => [restoredRow, ...list]);
+
+      const { error } = await supabase
+        .from("daily_tasks")
+        .update({ completed: false, section: "pending", task_date: todayKey })
+        .eq("id", row.id);
+      setSavingId(null);
+
+      if (error) {
+        toast.error("Couldn't restore task");
+        setPending((list) => list.filter((r) => r.id !== row.id));
+        setCompletedToday((list) => [row, ...list]);
+        return;
+      }
+
+      setSavedId(row.id);
+      setTimeout(() => setSavedId((id) => (id === row.id ? null : id)), 1200);
     }
   };
 
@@ -275,7 +316,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     );
   };
 
-  const isEmpty = loaded && completedYesterday.length === 0 && pending.length === 0 && blockers.length === 0;
+  const isEmpty = loaded && completedYesterday.length === 0 && completedToday.length === 0 && pending.length === 0 && blockers.length === 0;
 
   return (
     <Card>
@@ -321,6 +362,34 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
                           {row.task_text}
                         </span>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {completedToday.length > 0 && (
+                <div>
+                  <p className="font-semibold text-sm text-foreground mb-2">Completed Today</p>
+                  <div className="space-y-1.5">
+                    {completedToday.map((row) => (
+                      <label key={row.id} className="flex items-start gap-2 cursor-pointer group">
+                        <Checkbox
+                          checked={true}
+                          onCheckedChange={() => toggleTask(row)}
+                          className="mt-0.5"
+                          disabled={savingId === row.id}
+                        />
+                        <span className="text-sm leading-snug line-through text-muted-foreground flex-1">
+                          {row.task_text}
+                        </span>
+                        {savingId === row.id && (
+                          <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
+                        )}
+                        {savedId === row.id && savingId !== row.id && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
+                            <Check className="h-3 w-3" /> Saved
+                          </span>
+                        )}
+                      </label>
                     ))}
                   </div>
                 </div>
