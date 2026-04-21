@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
+import { dedupeTaskRows } from "@/lib/taskUtils";
 import { Loader2, FileText, Copy, Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,7 +50,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
       const { data, error } = await supabase.functions.invoke("ai-weekly-report", {
         body: {
           entries: entriesRes.data || [],
-          tasks: tasksRes.data || [],
+          tasks: dedupeTaskRows(tasksRes.data || []),
           emailTemplate: settingsRes.data?.email_template || "",
           weekLabel: formatWeekLabel(currentWeek),
         },
