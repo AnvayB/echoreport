@@ -306,10 +306,26 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
               )}
               {pending.length > 0 && (
                 <div>
-                  <p className="font-semibold text-sm text-foreground mb-2">Pending for Today</p>
-                  <div className="space-y-1.5">
-                    {pending.map(renderCheckboxRow)}
-                  </div>
+                  <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
+                    Pending for Today
+                    {grouping && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </p>
+                  {pendingGroups ? (
+                    <div className="space-y-3">
+                      {pendingGroups.map((g, gi) => (
+                        <div key={gi} className="pl-1">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                            {g.title}
+                          </p>
+                          <div className="space-y-1.5">
+                            {g.rows.map(renderCheckboxRow)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">{pending.map(renderCheckboxRow)}</div>
+                  )}
                 </div>
               )}
               {blockers.length > 0 && (
