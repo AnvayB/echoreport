@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VoiceInput from "./VoiceInput";
 import { formatDateKey, formatDayLabel } from "@/lib/weekUtils";
+import { dedupeTaskTexts, getTaskDuplicateKey, normalizeTaskText } from "@/lib/taskUtils";
 import { toast } from "sonner";
 import { Save, Loader2, Sparkles, Pencil } from "lucide-react";
 
@@ -108,31 +109,89 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       parseToItems(blockers),
     ]);
 
+    const uniqueCompletedItems = dedupeTaskTexts(completedItems);
+    const uniquePendingItems = dedupeTaskTexts(pendingItems);
+    const uniqueBlockerItems = dedupeTaskTexts(blockerItems);
+
     // Remove only EOD-sourced rows (sections: completed | pending | blocker).
     // Manually added rows live under "pending:manual" and are preserved.
-    await supabase
+    const { error: deleteError } = await supabase
       .from("daily_tasks")
       .delete()
       .eq("user_id", user.id)
       .eq("task_date", dateKey)
       .in("section", ["completed", "pending", "blocker"]);
 
+    if (deleteError) throw deleteError;
+
+    const { data: openRows, error: openRowsError } = await supabase
+      .from("daily_tasks")
+      .select("id, section, task_text")
+      .eq("user_id", user.id)
+      .eq("completed", false)
+      .in("section", ["pending", "pending:manual", "blocker"]);
+
+    if (openRowsError) throw openRowsError;
+
+    const openRowsByKey = new Map<string, { id: string; section: string; task_text: string }[]>();
+    (openRows ?? []).forEach((row) => {
+      const key = getTaskDuplicateKey(row);
+      openRowsByKey.set(key, [...(openRowsByKey.get(key) ?? []), row]);
+    });
+
+    const completedKeys = new Set(uniqueCompletedItems.map((item) => normalizeTaskText(item)));
+    const updates: Array<{ id: string; task_date: string; section: string; completed: boolean }> = [];
+
     const rows: Array<{
       user_id: string; task_date: string; section: string;
       task_text: string; completed: boolean;
     }> = [];
-    completedItems.forEach((t) =>
-      rows.push({ user_id: user.id, task_date: dateKey, section: "completed", task_text: t, completed: true })
-    );
-    pendingItems.forEach((t) =>
-      rows.push({ user_id: user.id, task_date: dateKey, section: "pending", task_text: t, completed: false })
-    );
-    blockerItems.forEach((t) =>
-      rows.push({ user_id: user.id, task_date: dateKey, section: "blocker", task_text: t, completed: false })
-    );
+    uniqueCompletedItems.forEach((taskText) => {
+      const normalized = normalizeTaskText(taskText);
+      const matchingPending =
+        openRowsByKey.get(`pending::${normalized}`)?.[0] ??
+        openRowsByKey.get(`blocker::${normalized}`)?.[0];
+
+      if (matchingPending) {
+        updates.push({ id: matchingPending.id, task_date: dateKey, section: "completed", completed: true });
+        return;
+      }
+
+      rows.push({ user_id: user.id, task_date: dateKey, section: "completed", task_text: taskText, completed: true });
+    });
+
+    uniquePendingItems.forEach((taskText) => {
+      const normalized = normalizeTaskText(taskText);
+      if (completedKeys.has(normalized)) return;
+      const key = `pending::${normalized}`;
+      if (openRowsByKey.has(key)) return;
+      rows.push({ user_id: user.id, task_date: dateKey, section: "pending", task_text: taskText, completed: false });
+    });
+
+    uniqueBlockerItems.forEach((taskText) => {
+      const normalized = normalizeTaskText(taskText);
+      if (completedKeys.has(normalized)) return;
+      const key = `blocker::${normalized}`;
+      if (openRowsByKey.has(key)) return;
+      rows.push({ user_id: user.id, task_date: dateKey, section: "blocker", task_text: taskText, completed: false });
+    });
+
+    if (updates.length > 0) {
+      const updateResults = await Promise.all(
+        updates.map((update) =>
+          supabase
+            .from("daily_tasks")
+            .update({ task_date: update.task_date, section: update.section, completed: update.completed })
+            .eq("id", update.id)
+        )
+      );
+      const updateError = updateResults.find((result) => result.error)?.error;
+      if (updateError) throw updateError;
+    }
 
     if (rows.length > 0) {
-      await supabase.from("daily_tasks").insert(rows);
+      const { error: insertError } = await supabase.from("daily_tasks").insert(rows);
+      if (insertError) throw insertError;
     }
   };
 
@@ -158,8 +217,10 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
       setIsFirstSave(false);
       onSaved();
-      // Fire-and-forget: re-sync structured task rows from this entry
-      syncTasksFromEntry();
+      syncTasksFromEntry().catch((taskSyncError) => {
+        console.error(taskSyncError);
+        toast.error("Saved entry, but task syncing failed");
+      });
     }
   };
 
