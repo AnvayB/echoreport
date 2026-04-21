@@ -25,11 +25,18 @@ interface TasksForTodayProps {
   selectedDate?: Date;
 }
 
+interface TaskGroup {
+  title: string;
+  rows: TaskRow[];
+}
+
 const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const { user } = useAuth();
   const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
   const [pending, setPending] = useState<TaskRow[]>([]);
   const [blockers, setBlockers] = useState<TaskRow[]>([]);
+  const [pendingGroups, setPendingGroups] = useState<TaskGroup[] | null>(null);
+  const [grouping, setGrouping] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
