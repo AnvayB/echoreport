@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
+import { dedupeTaskRows, dedupeTaskTexts } from "@/lib/taskUtils";
 import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles,
   ChevronDown, ChevronUp,
@@ -83,9 +84,9 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .order("task_date", { ascending: true }),
     ]);
 
-    setCompletedYesterday(completedRes.data ?? []);
-    setPending(pendingRes.data ?? []);
-    setBlockers(blockerRes.data ?? []);
+    setCompletedYesterday(dedupeTaskRows(completedRes.data ?? []));
+    setPending(dedupeTaskRows(pendingRes.data ?? []));
+    setBlockers(dedupeTaskRows(blockerRes.data ?? []));
     setLoaded(true);
     setLoading(false);
   };
@@ -194,7 +195,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         body: { text },
       });
       if (error) throw error;
-      const items: string[] = Array.isArray(data?.items) ? data.items : [];
+      const items = dedupeTaskTexts(Array.isArray(data?.items) ? data.items : []);
       if (items.length === 0) {
         toast.error("Couldn't extract any tasks from that text");
         return;
