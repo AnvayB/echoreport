@@ -172,7 +172,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const renderCheckboxRow = (row: TaskRow) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
-    const isCarryover = row.task_date < todayKey;
     return (
       <label key={row.id} className="flex items-start gap-2 cursor-pointer group">
         <Checkbox
@@ -187,11 +186,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
           }`}
         >
           {row.task_text}
-          {isCarryover && (
-            <span className="ml-1.5 text-xs text-muted-foreground/70">
-              (from {row.task_date})
-            </span>
-          )}
         </span>
         {isSaving && (
           <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
