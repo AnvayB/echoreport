@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VoiceInput from "./VoiceInput";
 import { formatDateKey, formatDayLabel } from "@/lib/weekUtils";
-import { dedupeTaskTexts, getTaskDuplicateKey, normalizeTaskText } from "@/lib/taskUtils";
+import { areTaskTextsEquivalent, dedupeTaskTexts, mergeDuplicateTaskRows, normalizeTaskText } from "@/lib/taskUtils";
 import { toast } from "sonner";
 import { Save, Loader2, Sparkles, Pencil } from "lucide-react";
 
@@ -133,11 +133,15 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
 
     if (openRowsError) throw openRowsError;
 
-    const openRowsByKey = new Map<string, { id: string; section: string; task_text: string }[]>();
-    (openRows ?? []).forEach((row) => {
-      const key = getTaskDuplicateKey(row);
-      openRowsByKey.set(key, [...(openRowsByKey.get(key) ?? []), row]);
-    });
+    const { rows: uniqueOpenRows, duplicateIds } = mergeDuplicateTaskRows(openRows ?? []);
+    if (duplicateIds.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from("daily_tasks")
+        .delete()
+        .in("id", duplicateIds);
+
+      if (cleanupError) throw cleanupError;
+    }
 
     const completedKeys = new Set(uniqueCompletedItems.map((item) => normalizeTaskText(item)));
     const updates: Array<{ id: string; task_date: string; section: string; completed: boolean }> = [];
@@ -148,9 +152,9 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     }> = [];
     uniqueCompletedItems.forEach((taskText) => {
       const normalized = normalizeTaskText(taskText);
-      const matchingPending =
-        openRowsByKey.get(`pending::${normalized}`)?.[0] ??
-        openRowsByKey.get(`blocker::${normalized}`)?.[0];
+      const matchingPending = uniqueOpenRows.find(
+        (row) => ["pending", "pending:manual", "blocker"].includes(row.section) && areTaskTextsEquivalent(row.task_text, taskText)
+      );
 
       if (matchingPending) {
         updates.push({ id: matchingPending.id, task_date: dateKey, section: "completed", completed: true });
@@ -163,16 +167,14 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     uniquePendingItems.forEach((taskText) => {
       const normalized = normalizeTaskText(taskText);
       if (completedKeys.has(normalized)) return;
-      const key = `pending::${normalized}`;
-      if (openRowsByKey.has(key)) return;
+      if (uniqueOpenRows.some((row) => row.section.startsWith("pending") && areTaskTextsEquivalent(row.task_text, taskText))) return;
       rows.push({ user_id: user.id, task_date: dateKey, section: "pending", task_text: taskText, completed: false });
     });
 
     uniqueBlockerItems.forEach((taskText) => {
       const normalized = normalizeTaskText(taskText);
       if (completedKeys.has(normalized)) return;
-      const key = `blocker::${normalized}`;
-      if (openRowsByKey.has(key)) return;
+      if (uniqueOpenRows.some((row) => row.section === "blocker" && areTaskTextsEquivalent(row.task_text, taskText))) return;
       rows.push({ user_id: user.id, task_date: dateKey, section: "blocker", task_text: taskText, completed: false });
     });
 
