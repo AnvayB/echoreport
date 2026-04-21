@@ -7,8 +7,11 @@ export const normalizeTaskText = (text: string) =>
     .replace(/[.?!,:;]+$/g, "")
     .trim();
 
-export const getTaskSectionFamily = (section: string) =>
-  section.startsWith("pending") ? "pending" : section;
+export const getTaskSectionFamily = (section: string) => {
+  if (section.startsWith("pending")) return "pending";
+  if (section.startsWith("completed")) return "completed";
+  return section;
+};
 
 const GENERIC_TASK_WORDS = new Set([
   "a",

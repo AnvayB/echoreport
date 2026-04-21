@@ -25,19 +25,30 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
 
     const weekdays = getWeekdays(currentWeek);
     const dates = weekdays.map(formatDateKey);
+    const weekEndKey = getWeekEndKey(currentWeek);
 
-    const [entriesRes, tasksRes, settingsRes] = await Promise.all([
+    const [entriesRes, completedTasksRes, pendingTasksRes, settingsRes] = await Promise.all([
       supabase
         .from("daily_entries")
         .select("*")
         .eq("user_id", user.id)
         .in("entry_date", dates)
         .order("entry_date"),
+      // Completed tasks stamped during this week
       supabase
         .from("daily_tasks")
         .select("task_date, section, task_text, completed")
         .eq("user_id", user.id)
         .in("task_date", dates)
+        .eq("completed", true)
+        .order("task_date"),
+      // All open tasks up to week end — captures carry-overs from prior weeks
+      supabase
+        .from("daily_tasks")
+        .select("task_date, section, task_text, completed")
+        .eq("user_id", user.id)
+        .eq("completed", false)
+        .lte("task_date", weekEndKey)
         .order("task_date"),
       supabase
         .from("user_settings")
@@ -46,11 +57,16 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         .maybeSingle(),
     ]);
 
+    const allTasks = dedupeTaskRows([
+      ...(completedTasksRes.data || []),
+      ...(pendingTasksRes.data || []),
+    ]);
+
     try {
       const { data, error } = await supabase.functions.invoke("ai-weekly-report", {
         body: {
           entries: entriesRes.data || [],
-          tasks: dedupeTaskRows(tasksRes.data || []),
+          tasks: allTasks,
           emailTemplate: settingsRes.data?.email_template || "",
           weekLabel: formatWeekLabel(currentWeek),
         },

@@ -133,6 +133,15 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
 
     if (openRowsError) throw openRowsError;
 
+    const { data: manualCompletedRows, error: manualCompletedError } = await supabase
+      .from("daily_tasks")
+      .select("id, section, task_text")
+      .eq("user_id", user.id)
+      .eq("task_date", dateKey)
+      .eq("section", "completed:manual");
+
+    if (manualCompletedError) throw manualCompletedError;
+
     const { rows: uniqueOpenRows, duplicateIds } = mergeDuplicateTaskRows(openRows ?? []);
     if (duplicateIds.length > 0) {
       const { error: cleanupError } = await supabase
@@ -151,6 +160,12 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       task_text: string; completed: boolean;
     }> = [];
     uniqueCompletedItems.forEach((taskText) => {
+      // Skip: already checked off manually — don't create a duplicate completed row.
+      const alreadyManuallyCompleted = (manualCompletedRows ?? []).some(
+        (row) => areTaskTextsEquivalent(row.task_text, taskText)
+      );
+      if (alreadyManuallyCompleted) return;
+
       const normalized = normalizeTaskText(taskText);
       const matchingPending = uniqueOpenRows.find(
         (row) => ["pending", "pending:manual", "blocker"].includes(row.section) && areTaskTextsEquivalent(row.task_text, taskText)
