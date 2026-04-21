@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X,
 } from "lucide-react";
 import { useTasksForToday, type TaskRow } from "./TasksForTodayContext";
 
@@ -18,7 +18,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     pendingGroups, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
-    toggleTask, addMoreTasks, reload,
+    toggleTask, deleteTask, addMoreTasks, reload,
     isViewingToday,
   } = useTasksForToday();
 
@@ -46,6 +46,19 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             <Check className="h-3 w-3" /> Saved
           </span>
         )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteTask(row);
+          }}
+          disabled={isSaving}
+          aria-label="Remove task"
+          className="mt-0.5 shrink-0 text-muted-foreground/60 hover:text-destructive opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
       </label>
     );
   };

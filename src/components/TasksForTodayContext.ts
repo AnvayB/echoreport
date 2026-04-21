@@ -31,6 +31,7 @@ export interface TasksForTodayContextValue {
   setNewTasksText: (v: string) => void;
   adding: boolean;
   toggleTask: (row: TaskRow) => Promise<void>;
+  deleteTask: (row: TaskRow) => Promise<void>;
   addMoreTasks: () => Promise<void>;
   reload: () => Promise<void>;
 }

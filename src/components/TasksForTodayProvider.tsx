@@ -167,6 +167,31 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
   };
 
+  const deleteTask = async (row: TaskRow) => {
+    if (!user) return;
+    setSavingId(row.id);
+    const prevPending = pending;
+    const prevBlockers = blockers;
+    const prevCompletedToday = completedToday;
+    const prevCompletedYesterday = completedYesterday;
+    setPending((list) => list.filter((r) => r.id !== row.id));
+    setBlockers((list) => list.filter((r) => r.id !== row.id));
+    setCompletedToday((list) => list.filter((r) => r.id !== row.id));
+    setCompletedYesterday((list) => list.filter((r) => r.id !== row.id));
+
+    const { error } = await supabase.from("daily_tasks").delete().eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      toast.error("Couldn't remove task");
+      setPending(prevPending);
+      setBlockers(prevBlockers);
+      setCompletedToday(prevCompletedToday);
+      setCompletedYesterday(prevCompletedYesterday);
+      return;
+    }
+    toast.success("Task removed");
+  };
+
   const addMoreTasks = async () => {
     if (!user) return;
     const text = newTasksText.trim();
@@ -223,6 +248,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         setNewTasksText,
         adding,
         toggleTask,
+        deleteTask,
         addMoreTasks,
         reload: load,
       }}
