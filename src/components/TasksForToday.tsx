@@ -419,7 +419,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
                 </div>
               )}
               {blockers.length > 0 && (
-                <div>
+                <div className="rounded-lg border border-foreground bg-muted/50 p-3">
                   <p className="font-semibold text-sm text-foreground mb-2">Blockers & Follow-ups</p>
                   <div className="space-y-1.5">
                     {blockers.map(renderCheckboxRow)}
