@@ -352,7 +352,7 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
           {loaded && !isEmpty && (
             <div className="space-y-5">
               {completedYesterday.length > 0 && (
-                <div>
+                <div className="rounded-lg border border-foreground bg-muted/50 p-3">
                   <p className="font-semibold text-sm text-foreground mb-2">Completed Yesterday</p>
                   <div className="space-y-1.5">
                     {completedYesterday.map((row) => (
