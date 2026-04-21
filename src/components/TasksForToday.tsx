@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { dedupeTaskRows, dedupeTaskTexts } from "@/lib/taskUtils";
+import { dedupeTaskTexts, mergeDuplicateTaskRows } from "@/lib/taskUtils";
 import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles,
   ChevronDown, ChevronUp,
@@ -84,9 +84,29 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         .order("task_date", { ascending: true }),
     ]);
 
-    setCompletedYesterday(dedupeTaskRows(completedRes.data ?? []));
-    setPending(dedupeTaskRows(pendingRes.data ?? []));
-    setBlockers(dedupeTaskRows(blockerRes.data ?? []));
+    const completedResult = mergeDuplicateTaskRows(completedRes.data ?? []);
+    const pendingResult = mergeDuplicateTaskRows(pendingRes.data ?? []);
+    const blockerResult = mergeDuplicateTaskRows(blockerRes.data ?? []);
+    const duplicateIds = [
+      ...completedResult.duplicateIds,
+      ...pendingResult.duplicateIds,
+      ...blockerResult.duplicateIds,
+    ];
+
+    if (duplicateIds.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from("daily_tasks")
+        .delete()
+        .in("id", duplicateIds);
+
+      if (cleanupError) {
+        console.error("Failed to clean duplicate tasks:", cleanupError);
+      }
+    }
+
+    setCompletedYesterday(completedResult.rows);
+    setPending(pendingResult.rows);
+    setBlockers(blockerResult.rows);
     setLoaded(true);
     setLoading(false);
   };
