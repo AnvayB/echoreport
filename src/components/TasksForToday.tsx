@@ -97,6 +97,54 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, todayKey]);
 
+  // Group pending tasks by project/theme via AI. Re-runs only when the set of pending ids changes.
+  const pendingIdsKey = pending.map((r) => r.id).sort().join("|");
+  useEffect(() => {
+    if (pending.length === 0) {
+      setPendingGroups(null);
+      return;
+    }
+    if (pending.length <= 2) {
+      setPendingGroups([{ title: "General", rows: pending }]);
+      return;
+    }
+    let cancelled = false;
+    setGrouping(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
+          body: {
+            tasks: pending.map((r) => ({ id: r.id, task_text: r.task_text })),
+          },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        const rawGroups: Array<{ title: string; task_ids: string[] }> =
+          Array.isArray(data?.groups) ? data.groups : [];
+        const byId = new Map(pending.map((r) => [r.id, r]));
+        const used = new Set<string>();
+        const groups: TaskGroup[] = [];
+        rawGroups.forEach((g) => {
+          const rows = (g.task_ids || [])
+            .map((id) => byId.get(id))
+            .filter((r): r is TaskRow => Boolean(r) && !used.has(r!.id));
+          rows.forEach((r) => used.add(r.id));
+          if (rows.length > 0) groups.push({ title: g.title, rows });
+        });
+        const leftover = pending.filter((r) => !used.has(r.id));
+        if (leftover.length > 0) groups.push({ title: "Other", rows: leftover });
+        setPendingGroups(groups.length > 0 ? groups : [{ title: "General", rows: pending }]);
+      } catch (e) {
+        console.error("Failed to group tasks:", e);
+        if (!cancelled) setPendingGroups([{ title: "General", rows: pending }]);
+      } finally {
+        if (!cancelled) setGrouping(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingIdsKey]);
+
   const toggleTask = async (row: TaskRow) => {
     if (!user) return;
     const newCompleted = !row.completed;
