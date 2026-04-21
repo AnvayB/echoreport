@@ -90,6 +90,27 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       setPendingGroups([{ title: "General", rows: pending }]);
       return;
     }
+    // If current groups already cover a superset of the current pending IDs,
+    // just filter them in place — no need to re-run the AI grouping.
+    const currentIds = new Set(pending.map((r) => r.id));
+    setPendingGroups((prev) => {
+      if (!prev) return prev;
+      const groupedIds = new Set(prev.flatMap((g) => g.rows.map((r) => r.id)));
+      const allCovered = [...currentIds].every((id) => groupedIds.has(id));
+      if (!allCovered) return prev; // new ids exist → fall through to AI regroup below
+      const filtered = prev
+        .map((g) => ({ ...g, rows: g.rows.filter((r) => currentIds.has(r.id)) }))
+        .filter((g) => g.rows.length > 0);
+      return filtered;
+    });
+
+    // Only call AI re-grouping when there are NEW pending ids not yet grouped.
+    const existingGroupedIds = new Set(
+      (pendingGroups ?? []).flatMap((g) => g.rows.map((r) => r.id))
+    );
+    const hasNewIds = pending.some((r) => !existingGroupedIds.has(r.id));
+    if (!hasNewIds) return;
+
     let cancelled = false;
     setGrouping(true);
     (async () => {
