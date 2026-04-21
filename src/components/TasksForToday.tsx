@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { dedupeTaskRows, dedupeTaskTexts, mergeDuplicateTaskRows } from "@/lib/taskUtils";
+import { dedupeTaskTexts, mergeDuplicateTaskRows } from "@/lib/taskUtils";
 import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles,
   ChevronDown, ChevronUp,
