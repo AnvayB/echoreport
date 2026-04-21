@@ -25,24 +25,32 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     const weekdays = getWeekdays(currentWeek);
     const dates = weekdays.map(formatDateKey);
 
-    const { data: entries } = await supabase
-      .from("daily_entries")
-      .select("*")
-      .eq("user_id", user.id)
-      .in("entry_date", dates)
-      .order("entry_date");
-
-    const { data: settings } = await supabase
-      .from("user_settings")
-      .select("email_template")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const [entriesRes, tasksRes, settingsRes] = await Promise.all([
+      supabase
+        .from("daily_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("entry_date", dates)
+        .order("entry_date"),
+      supabase
+        .from("daily_tasks")
+        .select("task_date, section, task_text, completed")
+        .eq("user_id", user.id)
+        .in("task_date", dates)
+        .order("task_date"),
+      supabase
+        .from("user_settings")
+        .select("email_template")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
 
     try {
       const { data, error } = await supabase.functions.invoke("ai-weekly-report", {
         body: {
-          entries: entries || [],
-          emailTemplate: settings?.email_template || "",
+          entries: entriesRes.data || [],
+          tasks: tasksRes.data || [],
+          emailTemplate: settingsRes.data?.email_template || "",
           weekLabel: formatWeekLabel(currentWeek),
         },
       });

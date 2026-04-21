@@ -84,35 +84,55 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     }
   };
 
-  const seedTasksFromPending = async (pendingText: string) => {
-    if (!user || !pendingText.trim()) return;
-    const seedSection = "Pending for Today › From EOD Entry";
-    const { data: existing } = await supabase
-      .from("daily_tasks")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("task_date", dateKey)
-      .eq("section", seedSection)
-      .limit(1);
-    if (existing && existing.length > 0) return;
-
+  // Parse a free-form text block into structured task items via the AI helper.
+  const parseToItems = async (text: string): Promise<string[]> => {
+    if (!text.trim()) return [];
     try {
       const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
-        body: { text: pendingText },
+        body: { text },
       });
       if (error) throw error;
-      const items: string[] = Array.isArray(data?.items) ? data.items : [];
-      if (items.length === 0) return;
-      const rows = items.map((t) => ({
-        user_id: user.id,
-        task_date: dateKey,
-        section: seedSection,
-        task_text: t,
-        completed: false,
-      }));
-      await supabase.from("daily_tasks").insert(rows);
+      return Array.isArray(data?.items) ? data.items : [];
     } catch (e) {
-      console.error("Failed to seed tasks from EOD pending:", e);
+      console.error("Failed to parse tasks:", e);
+      return [];
+    }
+  };
+
+  // Idempotent re-sync: replace EOD-sourced rows for this date, but preserve manually-added rows.
+  const syncTasksFromEntry = async () => {
+    if (!user) return;
+    const [completedItems, pendingItems, blockerItems] = await Promise.all([
+      parseToItems(accomplishments),
+      parseToItems(pendingTasks),
+      parseToItems(blockers),
+    ]);
+
+    // Remove only EOD-sourced rows (sections: completed | pending | blocker).
+    // Manually added rows live under "pending:manual" and are preserved.
+    await supabase
+      .from("daily_tasks")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("task_date", dateKey)
+      .in("section", ["completed", "pending", "blocker"]);
+
+    const rows: Array<{
+      user_id: string; task_date: string; section: string;
+      task_text: string; completed: boolean;
+    }> = [];
+    completedItems.forEach((t) =>
+      rows.push({ user_id: user.id, task_date: dateKey, section: "completed", task_text: t, completed: true })
+    );
+    pendingItems.forEach((t) =>
+      rows.push({ user_id: user.id, task_date: dateKey, section: "pending", task_text: t, completed: false })
+    );
+    blockerItems.forEach((t) =>
+      rows.push({ user_id: user.id, task_date: dateKey, section: "blocker", task_text: t, completed: false })
+    );
+
+    if (rows.length > 0) {
+      await supabase.from("daily_tasks").insert(rows);
     }
   };
 
@@ -138,8 +158,8 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
       setIsFirstSave(false);
       onSaved();
-      // Fire-and-forget: seed pending_tasks into daily_tasks for tomorrow's carryover
-      seedTasksFromPending(pendingTasks);
+      // Fire-and-forget: re-sync structured task rows from this entry
+      syncTasksFromEntry();
     }
   };
 

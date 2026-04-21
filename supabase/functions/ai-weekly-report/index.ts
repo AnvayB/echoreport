@@ -6,19 +6,50 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface DailyEntry {
+  entry_date: string;
+  accomplishments?: string;
+  pending_tasks?: string;
+  blockers?: string;
+  notes?: string;
+}
+
+interface DailyTask {
+  task_date: string;
+  section: string;
+  task_text: string;
+  completed: boolean;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { entries, emailTemplate, weekLabel } = await req.json();
+    const { entries, tasks, emailTemplate, weekLabel } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const entriesSummary = (entries || [])
-      .map((e: any) =>
+      .map((e: DailyEntry) =>
         `## ${e.entry_date}\nAccomplishments: ${e.accomplishments || "None"}\nPending: ${e.pending_tasks || "None"}\nBlockers: ${e.blockers || "None"}\nNotes: ${e.notes || "None"}`
       )
       .join("\n\n");
+
+    // Group tasks by completion / carryover (based on AUTHORITATIVE checkbox state)
+    const taskList: DailyTask[] = Array.isArray(tasks) ? tasks : [];
+    const completedTasks = taskList.filter((t) => t.completed);
+    const pendingTasks = taskList.filter((t) => !t.completed && (t.section === "pending" || t.section === "pending:manual"));
+    const blockerTasks = taskList.filter((t) => !t.completed && t.section === "blocker");
+
+    const fmtTaskList = (rows: DailyTask[]) =>
+      rows.length === 0
+        ? "  (none)"
+        : rows.map((r) => `  - [${r.task_date}] ${r.task_text}`).join("\n");
+
+    const taskSummary = `\n\n## Authoritative checkbox state for the week\n` +
+      `### Completed (checked off)\n${fmtTaskList(completedTasks)}\n\n` +
+      `### Still Pending (carries into next week)\n${fmtTaskList(pendingTasks)}\n\n` +
+      `### Open Blockers\n${fmtTaskList(blockerTasks)}\n`;
 
     const templateInstruction = emailTemplate
       ? `Follow this email format/template as closely as possible:\n\n${emailTemplate}`
@@ -26,11 +57,17 @@ serve(async (req) => {
 
     const systemPrompt = `You are a professional assistant that writes weekly status update emails. ${templateInstruction}
 
-Replace any placeholders with actual content from the daily entries. Output the full email as plain text ready to copy-paste.`;
+Replace any placeholders with actual content. Use the AUTHORITATIVE checkbox state as the source of truth for what is completed vs. carryover — it represents the user's actual progress. The daily entry text supplies highlights, lowlights, narrative context, and notes.
+
+Rules:
+- "Completed Tasks" / accomplishments must come from the checked-off task list (and may be enriched with narrative from the entries).
+- "Carry-over" / "Next Week" must come from the still-pending task list. Do NOT include items the user already checked off.
+- Open blockers go under blockers/challenges.
+- Output the full email as plain text ready to copy-paste. No markdown code fences.`;
 
     const userPrompt = `Generate my weekly status update email for the week of ${weekLabel}.
 
-Here are my daily entries:\n\n${entriesSummary || "No entries recorded this week."}`;
+Here are my daily entries:\n\n${entriesSummary || "No entries recorded this week."}${taskSummary}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
