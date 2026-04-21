@@ -6,40 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
-import { Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles,
+  ChevronDown, ChevronUp,
+} from "lucide-react";
 import { toast } from "sonner";
 import { isSameDay } from "date-fns";
 
-interface TaskItem {
-  text: string;
-  completed: boolean;
-}
-
-interface SubSection {
-  title: string;
-  items: TaskItem[];
-}
-
-interface TaskSection {
-  title: string;
-  // Either flat items OR grouped subsections (Pending for Today uses subsections)
-  items?: TaskItem[];
-  subsections?: SubSection[];
-}
-
-interface TaskTextRow {
+interface TaskRow {
+  id: string;
   task_text: string;
-}
-
-interface CurrentTaskRow extends TaskTextRow {
   completed: boolean;
+  section: string;
+  task_date: string;
 }
-
-const SECTION_SEPARATOR = " › ";
-const PENDING_TITLE = "Pending for Today";
-const TOP_ORDER = ["Completed Yesterday", PENDING_TITLE, "Carryover, Blockers & Follow-ups"];
-
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 interface TasksForTodayProps {
   selectedDate?: Date;
@@ -47,393 +27,102 @@ interface TasksForTodayProps {
 
 const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const { user } = useAuth();
-  const [sections, setSections] = useState<TaskSection[] | null>(null);
+  const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
+  const [pending, setPending] = useState<TaskRow[]>([]);
+  const [blockers, setBlockers] = useState<TaskRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [newTasksText, setNewTasksText] = useState("");
   const [adding, setAdding] = useState(false);
-  const todayKey = formatDateKey(new Date());
+
+  const today = selectedDate ?? new Date();
+  const todayKey = formatDateKey(today);
   const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
   const [expanded, setExpanded] = useState(true);
 
-  const buildCompletedExclusion = async (
-    accomplishmentsText: string,
-    historicalCompleted: TaskTextRow[],
-    currentTasks: CurrentTaskRow[],
-  ) => {
-    const completedExclusionSet = new Set<string>();
-    const completedExclusionDisplay: string[] = [];
-
-    const addToExclusion = (text: string) => {
-      const key = norm(text);
-      if (!key || completedExclusionSet.has(key)) return;
-      completedExclusionSet.add(key);
-      completedExclusionDisplay.push(text);
-    };
-
-    historicalCompleted.forEach((task) => addToExclusion(task.task_text));
-    currentTasks.filter((task) => task.completed).forEach((task) => addToExclusion(task.task_text));
-
-    if (accomplishmentsText.trim()) {
-      try {
-        const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
-          body: { text: accomplishmentsText },
-        });
-        if (error) throw error;
-        const accomplishmentItems: string[] = Array.isArray(data?.items) ? data.items : [];
-        accomplishmentItems.forEach(addToExclusion);
-      } catch (e) {
-        console.error("Accomplishment exclusion parse failed:", e);
-      }
-    }
-
-    return { completedExclusionSet, completedExclusionDisplay };
-  };
-
-  // Auto-collapse when navigating to a past/future day; auto-expand on today
   useEffect(() => {
     setExpanded(isViewingToday);
   }, [isViewingToday]);
 
-  // Load existing tasks from DB on mount
-  useEffect(() => {
-    if (!user) return;
-    const loadExisting = async () => {
-      const prevKey = formatDateKey(getPreviousWorkday(new Date()));
-      const [todayRes, prevEntryRes, everCompletedRes] = await Promise.all([
-        supabase
-          .from("daily_tasks")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("task_date", todayKey),
-        supabase
-          .from("daily_entries")
-          .select("accomplishments")
-          .eq("user_id", user.id)
-          .eq("entry_date", prevKey)
-          .maybeSingle(),
-        supabase
-          .from("daily_tasks")
-          .select("task_text")
-          .eq("user_id", user.id)
-          .eq("completed", true)
-          .lte("task_date", todayKey),
-      ]);
-
-      const { completedExclusionSet } = await buildCompletedExclusion(
-        prevEntryRes.data?.accomplishments || "",
-        everCompletedRes.data || [],
-        (todayRes.data || []).map((row) => ({ task_text: row.task_text, completed: row.completed })),
-      );
-
-      const data = (todayRes.data || []).filter((row) => (
-        row.section === "Completed Yesterday" || !completedExclusionSet.has(norm(row.task_text))
-      ));
-
-      if (data.length === 0) {
-        setSections(null);
-        return;
-      }
-
-      // Group rows by top-level section, preserving subsection structure if present
-      const topMap = new Map<string, Map<string | null, TaskItem[]>>();
-      data.forEach((row) => {
-        const [top, sub = null] = row.section.split(SECTION_SEPARATOR);
-        if (!topMap.has(top)) topMap.set(top, new Map());
-        const subMap = topMap.get(top)!;
-        const key = sub;
-        if (!subMap.has(key)) subMap.set(key, []);
-        subMap.get(key)!.push({ text: row.task_text, completed: row.completed });
-      });
-
-      const restored: TaskSection[] = [];
-      const visit = (top: string) => {
-        if (!topMap.has(top)) return;
-        const subMap = topMap.get(top)!;
-        const hasSubs = Array.from(subMap.keys()).some((k) => k !== null);
-        if (hasSubs) {
-          const subsections: SubSection[] = [];
-          subMap.forEach((items, subTitle) => {
-            subsections.push({ title: subTitle ?? "General", items });
-          });
-          restored.push({ title: top, subsections });
-        } else {
-          restored.push({ title: top, items: subMap.get(null) ?? [] });
-        }
-        topMap.delete(top);
-      };
-      TOP_ORDER.forEach(visit);
-      topMap.forEach((_subMap, top) => visit(top));
-      setSections(restored);
-    };
-    loadExisting();
-  }, [user, todayKey]);
-
-  const fetchTasks = async () => {
+  const load = async () => {
     if (!user) return;
     setLoading(true);
+    const prevKey = formatDateKey(getPreviousWorkday(today));
 
-    const prevDay = getPreviousWorkday(new Date());
-    const prevKey = formatDateKey(prevDay);
-
-    const [entryRes, prevTasksRes, incompletePastRes, everCompletedRes, todayTasksRes] = await Promise.all([
+    const [completedRes, pendingRes, blockerRes] = await Promise.all([
       supabase
-        .from("daily_entries")
+        .from("daily_tasks")
         .select("*")
         .eq("user_id", user.id)
-        .eq("entry_date", prevKey)
-        .maybeSingle(),
+        .eq("task_date", prevKey)
+        .eq("completed", true),
       supabase
         .from("daily_tasks")
-        .select("task_text, completed, section, task_date")
-        .eq("user_id", user.id)
-        .eq("task_date", prevKey),
-      supabase
-        .from("daily_tasks")
-        .select("task_text, section, task_date")
+        .select("*")
         .eq("user_id", user.id)
         .eq("completed", false)
-        .lt("task_date", todayKey),
+        .in("section", ["pending", "pending:manual"])
+        .lte("task_date", todayKey)
+        .order("task_date", { ascending: true }),
       supabase
         .from("daily_tasks")
-        .select("task_text")
+        .select("*")
         .eq("user_id", user.id)
-        .eq("completed", true)
-        .lte("task_date", todayKey),
-      supabase
-        .from("daily_tasks")
-        .select("task_text, completed")
-        .eq("user_id", user.id)
-        .eq("task_date", todayKey),
+        .eq("completed", false)
+        .eq("section", "blocker")
+        .lte("task_date", todayKey)
+        .order("task_date", { ascending: true }),
     ]);
 
-    let prevTasks = prevTasksRes.data || [];
-    let carryoverData = incompletePastRes.data || [];
-    if (entryRes.data && prevTasks.length === 0 && (entryRes.data.pending_tasks || "").trim()) {
-      try {
-        const { data: parsed } = await supabase.functions.invoke("ai-parse-tasks", {
-          body: { text: entryRes.data.pending_tasks },
-        });
-        const items: string[] = Array.isArray(parsed?.items) ? parsed.items : [];
-        if (items.length > 0) {
-          const seedSection = "Pending for Today › From EOD Entry";
-          const seedRows = items.map((t) => ({
-            user_id: user.id,
-            task_date: prevKey,
-            section: seedSection,
-            task_text: t,
-            completed: false,
-          }));
-          await supabase.from("daily_tasks").insert(seedRows);
-          prevTasks = seedRows.map((r) => ({
-            task_text: r.task_text,
-            completed: r.completed,
-            section: r.section,
-            task_date: r.task_date,
-          }));
-          carryoverData = [
-            ...carryoverData,
-            ...seedRows.map((r) => ({ task_text: r.task_text, section: r.section, task_date: r.task_date })),
-          ];
-        }
-      } catch (e) {
-        console.error("Backfill seed failed:", e);
-      }
-    }
-
-    if (!entryRes.data && carryoverData.length === 0) {
-      setSections([{ title: "Info", items: [{ text: "No entry found for the previous workday and no pending tasks. Start fresh today!", completed: false }] }]);
-      setLoading(false);
-      return;
-    }
-
-    const { completedExclusionSet, completedExclusionDisplay } = await buildCompletedExclusion(
-      entryRes.data?.accomplishments || "",
-      everCompletedRes.data || [],
-      todayTasksRes.data || [],
-    );
-
-    const completedByText = new Map<string, boolean>();
-    (todayTasksRes.data || []).forEach((t) => {
-      completedByText.set(norm(t.task_text), t.completed);
-    });
-    completedExclusionSet.forEach((key) => completedByText.set(key, true));
-
-    const carryoverMap = new Map<string, { task_text: string; task_date: string; section: string }>();
-    carryoverData.forEach((r) => {
-      if (completedExclusionSet.has(norm(r.task_text))) return;
-      const existing = carryoverMap.get(r.task_text);
-      if (!existing || r.task_date < existing.task_date) {
-        carryoverMap.set(r.task_text, r);
-      }
-    });
-    const carryover = Array.from(carryoverMap.values());
-
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-daily-tasks", {
-        body: {
-          entry: entryRes.data || { accomplishments: "", pending_tasks: "", blockers: "", notes: "" },
-          completed_tasks: prevTasks,
-          incomplete_carryover: carryover,
-          completed_exclusion: completedExclusionDisplay,
-        },
-      });
-      if (error) throw error;
-
-      if (data.sections) {
-        const parsed: TaskSection[] = data.sections.map((s: { title: string; items?: string[]; subsections?: { title: string; items: string[] }[] }) => {
-          const restoreCompleted = (text: string) =>
-            s.title === "Completed Yesterday" ? true : (completedByText.get(norm(text)) ?? false);
-          if (s.subsections && Array.isArray(s.subsections)) {
-            return {
-              title: s.title,
-              subsections: s.subsections.map((sub) => ({
-                title: sub.title,
-                items: (sub.items || [])
-                  .filter((text) => !completedExclusionSet.has(norm(text)))
-                  .map((text) => ({ text, completed: restoreCompleted(text) })),
-              })).filter((sub) => sub.items.length > 0),
-            };
-          }
-          return {
-            title: s.title,
-            items: (s.items || [])
-              .filter((text) =>
-                s.title === "Completed Yesterday" ? true : !completedExclusionSet.has(norm(text))
-              )
-              .map((text) => ({ text, completed: restoreCompleted(text) })),
-          };
-        });
-        setSections(parsed);
-        await persistTasks(parsed);
-      } else if (data.summary) {
-        setSections([{ title: "Tasks", items: [{ text: data.summary, completed: false }] }]);
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to generate task summary");
-    } finally {
-      setLoading(false);
-    }
+    setCompletedYesterday(completedRes.data ?? []);
+    setPending(pendingRes.data ?? []);
+    setBlockers(blockerRes.data ?? []);
+    setLoaded(true);
+    setLoading(false);
   };
 
-  const sectionKeyFor = (top: string, sub?: string | null) =>
-    sub ? `${top}${SECTION_SEPARATOR}${sub}` : top;
-
-  const persistTasks = async (taskSections: TaskSection[]) => {
+  // Auto-load on mount / when date or user changes
+  useEffect(() => {
     if (!user) return;
-    await supabase.from("daily_tasks").delete().eq("user_id", user.id).eq("task_date", todayKey);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, todayKey]);
 
-    const rows: Array<{ user_id: string; task_date: string; section: string; task_text: string; completed: boolean }> = [];
-    taskSections.forEach((section) => {
-      if (section.subsections) {
-        section.subsections.forEach((sub) => {
-          sub.items.forEach((item) => {
-            rows.push({
-              user_id: user.id,
-              task_date: todayKey,
-              section: sectionKeyFor(section.title, sub.title),
-              task_text: item.text,
-              completed: item.completed,
-            });
-          });
-        });
-      } else if (section.items) {
-        section.items.forEach((item) => {
-          rows.push({
-            user_id: user.id,
-            task_date: todayKey,
-            section: section.title,
-            task_text: item.text,
-            completed: item.completed,
-          });
-        });
-      }
-    });
-    if (rows.length > 0) {
-      await supabase.from("daily_tasks").insert(rows);
-    }
-  };
+  const toggleTask = async (row: TaskRow) => {
+    if (!user) return;
+    const newCompleted = !row.completed;
+    setSavingId(row.id);
 
-  const toggleTaskAt = async (
-    sectionIdx: number,
-    subIdx: number | null,
-    itemIdx: number,
-  ) => {
-    if (!sections || !user) return;
+    // Optimistic update
+    const update = (list: TaskRow[]) =>
+      list.map((r) => (r.id === row.id ? { ...r, completed: newCompleted } : r));
+    setPending(update);
+    setBlockers(update);
 
-    const updated = sections.map((section, si) => {
-      if (si !== sectionIdx) return section;
-      if (subIdx !== null && section.subsections) {
-        return {
-          ...section,
-          subsections: section.subsections.map((sub, sj) => {
-            if (sj !== subIdx) return sub;
-            return {
-              ...sub,
-              items: sub.items.map((item, ii) =>
-                ii === itemIdx ? { ...item, completed: !item.completed } : item
-              ),
-            };
-          }),
-        };
-      }
-      if (subIdx === null && section.items) {
-        return {
-          ...section,
-          items: section.items.map((item, ii) =>
-            ii === itemIdx ? { ...item, completed: !item.completed } : item
-          ),
-        };
-      }
-      return section;
-    });
-    setSections(updated);
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update({ completed: newCompleted })
+      .eq("id", row.id);
+    setSavingId(null);
 
-    const targetSection = updated[sectionIdx];
-    let task: TaskItem;
-    let dbSection: string;
-    if (subIdx !== null && targetSection.subsections) {
-      task = targetSection.subsections[subIdx].items[itemIdx];
-      dbSection = sectionKeyFor(targetSection.title, targetSection.subsections[subIdx].title);
-    } else if (targetSection.items) {
-      task = targetSection.items[itemIdx];
-      dbSection = targetSection.title;
-    } else {
+    if (error) {
+      toast.error("Couldn't save task status");
+      // Revert
+      setPending((list) => list.map((r) => (r.id === row.id ? { ...r, completed: row.completed } : r)));
+      setBlockers((list) => list.map((r) => (r.id === row.id ? { ...r, completed: row.completed } : r)));
       return;
     }
 
-    const key = `${sectionIdx}-${subIdx ?? "x"}-${itemIdx}`;
-    setSavingKey(key);
+    setSavedId(row.id);
+    setTimeout(() => setSavedId((id) => (id === row.id ? null : id)), 1200);
 
-    const { data: existing } = await supabase
-      .from("daily_tasks")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("task_date", todayKey)
-      .eq("task_text", task.text)
-      .eq("section", dbSection)
-      .maybeSingle();
-
-    if (existing) {
-      const { error } = await supabase
-        .from("daily_tasks")
-        .update({ completed: task.completed })
-        .eq("id", existing.id);
-      setSavingKey(null);
-      if (error) {
-        toast.error("Couldn't save task status");
-        return;
-      }
-      toast.success(
-        task.completed ? "Task marked complete — saved as context" : "Task marked incomplete — saved"
-      );
-      setSavedKey(key);
-      setTimeout(() => setSavedKey((k) => (k === key ? null : k)), 1500);
-    } else {
-      setSavingKey(null);
-      toast.error("Couldn't find task to update");
+    if (newCompleted) {
+      // Remove from current list (it'll show under Completed on its source date)
+      setPending((list) => list.filter((r) => r.id !== row.id));
+      setBlockers((list) => list.filter((r) => r.id !== row.id));
+      toast.success("Task complete");
     }
   };
 
@@ -456,55 +145,20 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         return;
       }
 
-      const current = sections ?? [];
-      const newItems: TaskItem[] = items.map((t) => ({ text: t, completed: false }));
-      const ADDED_SUB_TITLE = "Added Manually";
-
-      let updated: TaskSection[];
-      const pendingIdx = current.findIndex((s) => s.title === PENDING_TITLE);
-
-      if (pendingIdx === -1) {
-        updated = [
-          ...current,
-          { title: PENDING_TITLE, subsections: [{ title: ADDED_SUB_TITLE, items: newItems }] },
-        ];
-      } else {
-        const pending = current[pendingIdx];
-        let newPending: TaskSection;
-        if (pending.subsections) {
-          const existingSubIdx = pending.subsections.findIndex((s) => s.title === ADDED_SUB_TITLE);
-          const newSubs = existingSubIdx >= 0
-            ? pending.subsections.map((s, i) =>
-                i === existingSubIdx ? { ...s, items: [...s.items, ...newItems] } : s
-              )
-            : [...pending.subsections, { title: ADDED_SUB_TITLE, items: newItems }];
-          newPending = { ...pending, subsections: newSubs };
-        } else {
-          // Convert flat to subsections
-          const existingItems = pending.items ?? [];
-          newPending = {
-            title: PENDING_TITLE,
-            subsections: [
-              ...(existingItems.length ? [{ title: "General", items: existingItems }] : []),
-              { title: ADDED_SUB_TITLE, items: newItems },
-            ],
-          };
-        }
-        updated = current.map((s, i) => (i === pendingIdx ? newPending : s));
-      }
-
-      setSections(updated);
-
-      const rows = newItems.map((item) => ({
+      const rows = items.map((t) => ({
         user_id: user.id,
         task_date: todayKey,
-        section: sectionKeyFor(PENDING_TITLE, ADDED_SUB_TITLE),
-        task_text: item.text,
-        completed: item.completed,
+        section: "pending:manual",
+        task_text: t,
+        completed: false,
       }));
-      const { error: insertError } = await supabase.from("daily_tasks").insert(rows);
+      const { data: inserted, error: insertError } = await supabase
+        .from("daily_tasks")
+        .insert(rows)
+        .select("*");
       if (insertError) throw insertError;
 
+      setPending((list) => [...list, ...(inserted ?? [])]);
       setNewTasksText("");
       toast.success(`Added ${items.length} task${items.length === 1 ? "" : "s"}`);
     } catch (e) {
@@ -515,39 +169,29 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     }
   };
 
-  // Render a single task row (checkbox or completed-yesterday icon)
-  const renderTaskRow = (
-    item: TaskItem,
-    sectionTitle: string,
-    sectionIdx: number,
-    subIdx: number | null,
-    itemIdx: number,
-  ) => {
-    if (sectionTitle === "Completed Yesterday") {
-      return (
-        <div key={itemIdx} className="flex items-start gap-2">
-          <CircleCheckBig className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-          <span className="text-sm leading-snug text-muted-foreground">{item.text}</span>
-        </div>
-      );
-    }
-    const key = `${sectionIdx}-${subIdx ?? "x"}-${itemIdx}`;
-    const isSaving = savingKey === key;
-    const isSaved = savedKey === key;
+  const renderCheckboxRow = (row: TaskRow) => {
+    const isSaving = savingId === row.id;
+    const isSaved = savedId === row.id;
+    const isCarryover = row.task_date < todayKey;
     return (
-      <label key={itemIdx} className="flex items-start gap-2 cursor-pointer group">
+      <label key={row.id} className="flex items-start gap-2 cursor-pointer group">
         <Checkbox
-          checked={item.completed}
-          onCheckedChange={() => toggleTaskAt(sectionIdx, subIdx, itemIdx)}
+          checked={row.completed}
+          onCheckedChange={() => toggleTask(row)}
           className="mt-0.5"
           disabled={isSaving}
         />
         <span
           className={`text-sm leading-snug transition-all flex-1 ${
-            item.completed ? "line-through text-muted-foreground" : "text-foreground"
+            row.completed ? "line-through text-muted-foreground" : "text-foreground"
           }`}
         >
-          {item.text}
+          {row.task_text}
+          {isCarryover && (
+            <span className="ml-1.5 text-xs text-muted-foreground/70">
+              (from {row.task_date})
+            </span>
+          )}
         </span>
         {isSaving && (
           <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
@@ -560,6 +204,8 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
       </label>
     );
   };
+
+  const isEmpty = loaded && completedYesterday.length === 0 && pending.length === 0 && blockers.length === 0;
 
   return (
     <Card>
@@ -581,79 +227,79 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
         </CardTitle>
       </CardHeader>
       {expanded && (
-      <CardContent>
-        {!sections && !loading && (
-          <Button onClick={fetchTasks} variant="outline" className="w-full">
-            What are my tasks for today?
-          </Button>
-        )}
-        {loading && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
-        {sections && (
-          <div className="space-y-5">
-            {sections.map((section, si) => (
-              <div key={si}>
-                <p className="font-semibold text-sm text-foreground mb-2">{section.title}</p>
-                {section.subsections ? (
-                  <div className="space-y-3">
-                    {section.subsections.map((sub, sj) => (
-                      <div key={sj} className="pl-1">
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
-                          {sub.title}
-                        </p>
-                        <div className="space-y-1.5">
-                          {sub.items.map((item, ii) =>
-                            renderTaskRow(item, section.title, si, sj, ii)
-                          )}
-                        </div>
+        <CardContent>
+          {loading && !loaded && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {loaded && isEmpty && (
+            <p className="text-sm text-muted-foreground py-2">
+              No tasks yet. Save an end-of-day entry to populate tomorrow's list, or add tasks below.
+            </p>
+          )}
+          {loaded && !isEmpty && (
+            <div className="space-y-5">
+              {completedYesterday.length > 0 && (
+                <div>
+                  <p className="font-semibold text-sm text-foreground mb-2">Completed Yesterday</p>
+                  <div className="space-y-1.5">
+                    {completedYesterday.map((row) => (
+                      <div key={row.id} className="flex items-start gap-2">
+                        <CircleCheckBig className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <span className="text-sm leading-snug text-muted-foreground">
+                          {row.task_text}
+                        </span>
                       </div>
                     ))}
                   </div>
-                ) : (
+                </div>
+              )}
+              {pending.length > 0 && (
+                <div>
+                  <p className="font-semibold text-sm text-foreground mb-2">Pending for Today</p>
                   <div className="space-y-1.5">
-                    {(section.items ?? []).map((item, ii) =>
-                      renderTaskRow(item, section.title, si, null, ii)
-                    )}
+                    {pending.map(renderCheckboxRow)}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {sections && (
-          <div className="mt-4 space-y-2 border-t border-border pt-4">
-            <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <Plus className="h-4 w-4" /> Add More Tasks
-            </label>
-            <Textarea
-              value={newTasksText}
-              onChange={(e) => setNewTasksText(e.target.value)}
-              placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
-              className="min-h-[60px]"
-              disabled={adding}
-            />
-            <div className="flex items-center gap-2">
-              <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
-                {adding ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Parsing…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks
-                  </>
-                )}
-              </Button>
-              <Button onClick={fetchTasks} variant="ghost" size="sm" disabled={adding}>
-                Refresh
-              </Button>
+                </div>
+              )}
+              {blockers.length > 0 && (
+                <div>
+                  <p className="font-semibold text-sm text-foreground mb-2">Blockers & Follow-ups</p>
+                  <div className="space-y-1.5">
+                    {blockers.map(renderCheckboxRow)}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        )}
-      </CardContent>
+          )}
+          {loaded && (
+            <div className="mt-4 space-y-2 border-t border-border pt-4">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <Plus className="h-4 w-4" /> Add More Tasks
+              </label>
+              <Textarea
+                value={newTasksText}
+                onChange={(e) => setNewTasksText(e.target.value)}
+                placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
+                className="min-h-[60px]"
+                disabled={adding}
+              />
+              <div className="flex items-center gap-2">
+                <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
+                  {adding ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Parsing…</>
+                  ) : (
+                    <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks</>
+                  )}
+                </Button>
+                <Button onClick={load} variant="ghost" size="sm" disabled={adding || loading}>
+                  Refresh
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
       )}
     </Card>
   );
