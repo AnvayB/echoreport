@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles,
 } from "lucide-react";
-import { useTasksForToday, TaskRow } from "./TasksForTodayProvider";
+import { useTasksForToday, type TaskRow } from "./TasksForTodayContext";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
