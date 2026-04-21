@@ -25,11 +25,18 @@ interface TasksForTodayProps {
   selectedDate?: Date;
 }
 
+interface TaskGroup {
+  title: string;
+  rows: TaskRow[];
+}
+
 const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const { user } = useAuth();
   const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
   const [pending, setPending] = useState<TaskRow[]>([]);
   const [blockers, setBlockers] = useState<TaskRow[]>([]);
+  const [pendingGroups, setPendingGroups] = useState<TaskGroup[] | null>(null);
+  const [grouping, setGrouping] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -89,6 +96,54 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, todayKey]);
+
+  // Group pending tasks by project/theme via AI. Re-runs only when the set of pending ids changes.
+  const pendingIdsKey = pending.map((r) => r.id).sort().join("|");
+  useEffect(() => {
+    if (pending.length === 0) {
+      setPendingGroups(null);
+      return;
+    }
+    if (pending.length <= 2) {
+      setPendingGroups([{ title: "General", rows: pending }]);
+      return;
+    }
+    let cancelled = false;
+    setGrouping(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
+          body: {
+            tasks: pending.map((r) => ({ id: r.id, task_text: r.task_text })),
+          },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        const rawGroups: Array<{ title: string; task_ids: string[] }> =
+          Array.isArray(data?.groups) ? data.groups : [];
+        const byId = new Map(pending.map((r) => [r.id, r]));
+        const used = new Set<string>();
+        const groups: TaskGroup[] = [];
+        rawGroups.forEach((g) => {
+          const rows = (g.task_ids || [])
+            .map((id) => byId.get(id))
+            .filter((r): r is TaskRow => Boolean(r) && !used.has(r!.id));
+          rows.forEach((r) => used.add(r.id));
+          if (rows.length > 0) groups.push({ title: g.title, rows });
+        });
+        const leftover = pending.filter((r) => !used.has(r.id));
+        if (leftover.length > 0) groups.push({ title: "Other", rows: leftover });
+        setPendingGroups(groups.length > 0 ? groups : [{ title: "General", rows: pending }]);
+      } catch (e) {
+        console.error("Failed to group tasks:", e);
+        if (!cancelled) setPendingGroups([{ title: "General", rows: pending }]);
+      } finally {
+        if (!cancelled) setGrouping(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingIdsKey]);
 
   const toggleTask = async (row: TaskRow) => {
     if (!user) return;
@@ -172,7 +227,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
   const renderCheckboxRow = (row: TaskRow) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
-    const isCarryover = row.task_date < todayKey;
     return (
       <label key={row.id} className="flex items-start gap-2 cursor-pointer group">
         <Checkbox
@@ -187,11 +241,6 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
           }`}
         >
           {row.task_text}
-          {isCarryover && (
-            <span className="ml-1.5 text-xs text-muted-foreground/70">
-              (from {row.task_date})
-            </span>
-          )}
         </span>
         {isSaving && (
           <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
@@ -257,10 +306,26 @@ const TasksForToday = ({ selectedDate }: TasksForTodayProps = {}) => {
               )}
               {pending.length > 0 && (
                 <div>
-                  <p className="font-semibold text-sm text-foreground mb-2">Pending for Today</p>
-                  <div className="space-y-1.5">
-                    {pending.map(renderCheckboxRow)}
-                  </div>
+                  <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
+                    Pending for Today
+                    {grouping && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </p>
+                  {pendingGroups ? (
+                    <div className="space-y-3">
+                      {pendingGroups.map((g, gi) => (
+                        <div key={gi} className="pl-1">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                            {g.title}
+                          </p>
+                          <div className="space-y-1.5">
+                            {g.rows.map(renderCheckboxRow)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">{pending.map(renderCheckboxRow)}</div>
+                  )}
                 </div>
               )}
               {blockers.length > 0 && (
