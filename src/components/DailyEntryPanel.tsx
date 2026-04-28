@@ -124,9 +124,29 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       parseToItems(blockers),
     ]);
 
-    const uniqueCompletedItems = dedupeTaskTexts(completedItems);
-    const uniquePendingItems = dedupeTaskTexts(pendingItems);
-    const uniqueBlockerItems = dedupeTaskTexts(blockerItems);
+    // Dedupe each list while preserving the first when-hint we see for each unique item.
+    const dedupeHints = (items: ScheduleHint[]): ScheduleHint[] => {
+      const out: ScheduleHint[] = [];
+      items.forEach((it) => {
+        if (!it?.text || !it.text.trim()) return;
+        if (out.some((e) => areTaskTextsEquivalent(e.text, it.text))) return;
+        out.push({ text: it.text, when: it.when ?? null });
+      });
+      return out;
+    };
+
+    const uniqueCompletedHints = dedupeHints(completedItems);
+    const uniquePendingHints = dedupeHints([
+      // Prefer schedule from the rich entry parse (which sees full free-text context),
+      // and fall back to per-line schedule from parseToItems(pendingTasks).
+      ...pendingTaskSchedule,
+      ...pendingItems,
+    ]);
+    const uniqueBlockerHints = dedupeHints(blockerItems);
+
+    const uniqueCompletedItems = uniqueCompletedHints.map((h) => h.text);
+    const uniquePendingItems = uniquePendingHints.map((h) => h.text);
+    const uniqueBlockerItems = uniqueBlockerHints.map((h) => h.text);
 
     // Remove only EOD-sourced rows (sections: completed | pending | blocker).
     // Manually added rows live under "pending:manual" and are preserved.
@@ -194,11 +214,12 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       rows.push({ user_id: user.id, task_date: dateKey, section: "completed", task_text: taskText, completed: true });
     });
 
-    uniquePendingItems.forEach((taskText) => {
+    uniquePendingHints.forEach(({ text: taskText, when }) => {
       const normalized = normalizeTaskText(taskText);
       if (completedKeys.has(normalized)) return;
       if (uniqueOpenRows.some((row) => row.section.startsWith("pending") && areTaskTextsEquivalent(row.task_text, taskText))) return;
-      rows.push({ user_id: user.id, task_date: dateKey, section: "pending", task_text: taskText, completed: false });
+      const taskDate = resolveWhenHint(when, date, dateKey);
+      rows.push({ user_id: user.id, task_date: taskDate, section: "pending", task_text: taskText, completed: false });
     });
 
     uniqueBlockerItems.forEach((taskText) => {
