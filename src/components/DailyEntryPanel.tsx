@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VoiceInput from "./VoiceInput";
 import { formatDateKey, formatDayLabel } from "@/lib/weekUtils";
-import { areTaskTextsEquivalent, dedupeTaskTexts, mergeDuplicateTaskRows, normalizeTaskText } from "@/lib/taskUtils";
+import { areTaskTextsEquivalent, mergeDuplicateTaskRows, normalizeTaskText } from "@/lib/taskUtils";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { Save, Loader2, Sparkles, Pencil } from "lucide-react";
