@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { dedupeTaskTexts, mergeDuplicateTaskRows } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent } from "@/lib/taskUtils";
+import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
 import {
@@ -285,25 +286,35 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
     setAdding(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-parse-tasks", { body: { text } });
+      const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
+        body: { text, today_date: todayKey },
+      });
       if (error) throw error;
-      const items = dedupeTaskTexts(Array.isArray(data?.items) ? data.items : []);
-      if (items.length === 0) {
+      const rawItems: Array<{ text: string; when: string | null }> = Array.isArray(data?.items)
+        ? data.items.filter((i: any) => i && typeof i.text === "string")
+        : [];
+      // Dedupe by text while preserving the first when-hint we see.
+      const seen: Array<{ text: string; when: string | null }> = [];
+      rawItems.forEach((it) => {
+        if (seen.some((e) => areTaskTextsEquivalent(e.text, it.text))) return;
+        seen.push({ text: it.text.trim(), when: it.when ?? null });
+      });
+      if (seen.length === 0) {
         toast.error("Couldn't extract any tasks from that text");
         return;
       }
-      const rows = items.map((t) => ({
+      const rows = seen.map((it) => ({
         user_id: user.id,
-        task_date: todayKey,
+        task_date: resolveWhenHint(it.when, today, todayKey),
         section: "pending:manual",
-        task_text: t,
+        task_text: it.text,
         completed: false,
       }));
       const { data: inserted, error: insertError } = await supabase.from("daily_tasks").insert(rows).select("*");
       if (insertError) throw insertError;
       setPending((list) => [...list, ...(inserted ?? [])]);
       setNewTasksText("");
-      toast.success(`Added ${items.length} task${items.length === 1 ? "" : "s"}`);
+      toast.success(`Added ${seen.length} task${seen.length === 1 ? "" : "s"}`);
     } catch (e) {
       console.error(e);
       toast.error("Failed to add tasks");

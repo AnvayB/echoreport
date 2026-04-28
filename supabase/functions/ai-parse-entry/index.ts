@@ -10,7 +10,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { text } = await req.json();
+    const body = await req.json();
+    const text: string = body?.text;
+    const todayDate: string | undefined = body?.today_date; // YYYY-MM-DD
+
     if (!text || typeof text !== "string") {
       return new Response(JSON.stringify({ error: "text is required" }), {
         status: 400,
@@ -21,18 +24,32 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are a productivity assistant. The user will give you a free-form brain dump of their workday. Parse it into exactly four categories and return a JSON object with these keys:
+    const dateContext = todayDate
+      ? `The entry is for ${todayDate} (YYYY-MM-DD). Use this as the anchor when the user mentions weekdays or relative dates.`
+      : "";
 
-- "accomplishments": things they completed or made progress on today
-- "pending_tasks": what's left to do, planned for tomorrow, or still in progress
-- "blockers": challenges, issues, blockers, or things slowing them down
-- "notes": anything else — follow-ups, random thoughts, reminders
+    const systemPrompt = `You are a productivity assistant. The user will give you a free-form brain dump of their workday. Parse it into structured fields and return via the parse_entry tool.
+
+${dateContext}
+
+Fields:
+- "accomplishments": bullet list (lines starting with "- ") of things they completed or made progress on today.
+- "pending_tasks": bullet list of what's left to do, planned for tomorrow, or still in progress.
+- "blockers": bullet list of challenges, issues, blockers.
+- "notes": anything else — follow-ups, random thoughts, reminders.
+- "pending_task_schedule": parallel structured list of pending tasks with WHEN each should happen. The "text" of each item should match (or closely paraphrase) one bullet from "pending_tasks".
+
+For each pending task's "when":
+- "today" if the user implies today / no specific date.
+- "tomorrow" if they say tomorrow / next day / in the morning (since this is end-of-day journaling, "tomorrow" is common).
+- "this_week" if they say later this week / by Friday / by end of week.
+- A specific "YYYY-MM-DD" if they name a weekday or date you can resolve from the anchor date.
+- null if genuinely unclear.
 
 Rules:
-- Use bullet points (lines starting with "- ") within each field
-- If a category has nothing relevant, return an empty string ""
-- Keep the user's original wording as much as possible, just reorganize it
-- Return ONLY valid JSON, no markdown fences, no extra text`;
+- Use bullet points (lines starting with "- ") within the four text fields.
+- If a category has nothing, return an empty string "" (or empty array for pending_task_schedule).
+- Keep the user's wording as much as possible.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -51,7 +68,7 @@ Rules:
             type: "function",
             function: {
               name: "parse_entry",
-              description: "Parse a free-form work update into structured categories",
+              description: "Parse a free-form work update into structured categories with per-task scheduling hints.",
               parameters: {
                 type: "object",
                 properties: {
@@ -59,8 +76,21 @@ Rules:
                   pending_tasks: { type: "string", description: "What's left or planned for tomorrow" },
                   blockers: { type: "string", description: "Challenges or blockers" },
                   notes: { type: "string", description: "Other notes or follow-ups" },
+                  pending_task_schedule: {
+                    type: "array",
+                    description: "One entry per pending task with a when-hint.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        text: { type: "string" },
+                        when: { type: ["string", "null"], description: "today | tomorrow | this_week | YYYY-MM-DD | null" },
+                      },
+                      required: ["text", "when"],
+                      additionalProperties: false,
+                    },
+                  },
                 },
-                required: ["accomplishments", "pending_tasks", "blockers", "notes"],
+                required: ["accomplishments", "pending_tasks", "blockers", "notes", "pending_task_schedule"],
                 additionalProperties: false,
               },
             },
@@ -88,18 +118,21 @@ Rules:
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (toolCall?.function?.arguments) {
       const parsed = JSON.parse(toolCall.function.arguments);
+      // Ensure schedule field exists for older callers / safety.
+      if (!Array.isArray(parsed.pending_task_schedule)) parsed.pending_task_schedule = [];
       return new Response(JSON.stringify(parsed), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fallback: try to parse from content
+    // Fallback
     const content = data.choices?.[0]?.message?.content || "";
     const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed.pending_task_schedule)) parsed.pending_task_schedule = [];
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

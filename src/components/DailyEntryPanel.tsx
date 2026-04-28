@@ -6,9 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VoiceInput from "./VoiceInput";
 import { formatDateKey, formatDayLabel } from "@/lib/weekUtils";
-import { areTaskTextsEquivalent, dedupeTaskTexts, mergeDuplicateTaskRows, normalizeTaskText } from "@/lib/taskUtils";
+import { areTaskTextsEquivalent, mergeDuplicateTaskRows, normalizeTaskText } from "@/lib/taskUtils";
+import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { Save, Loader2, Sparkles, Pencil } from "lucide-react";
+
+type ScheduleHint = { text: string; when: string | null };
 
 interface DailyEntryPanelProps {
   date: Date;
@@ -26,6 +29,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState(false);
   const [isFirstSave, setIsFirstSave] = useState(true);
+  const [pendingTaskSchedule, setPendingTaskSchedule] = useState<ScheduleHint[]>([]);
 
   const dateKey = formatDateKey(date);
 
@@ -37,6 +41,7 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     setPendingTasks("");
     setBlockers("");
     setNotes("");
+    setPendingTaskSchedule([]);
     setParsed(false);
     setIsFirstSave(true);
     supabase
@@ -67,18 +72,25 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
     setParsing(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-parse-entry", {
-        body: { text: freeText },
+        body: { text: freeText, today_date: dateKey },
       });
       if (error) throw error;
       setAccomplishments(data.accomplishments || "");
       setPendingTasks(data.pending_tasks || "");
       setBlockers(data.blockers || "");
       setNotes(data.notes || "");
+      const schedule: ScheduleHint[] = Array.isArray(data?.pending_task_schedule)
+        ? data.pending_task_schedule
+            .filter((s: any) => s && typeof s.text === "string")
+            .map((s: any) => ({ text: s.text, when: typeof s.when === "string" ? s.when : null }))
+        : [];
+      setPendingTaskSchedule(schedule);
       setParsed(true);
     } catch (e) {
       console.error(e);
       toast.error("Failed to parse entry. You can edit the fields manually.");
       setAccomplishments(freeText);
+      setPendingTaskSchedule([]);
       setParsed(true);
     } finally {
       setParsing(false);
@@ -86,14 +98,17 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   };
 
   // Parse a free-form text block into structured task items via the AI helper.
-  const parseToItems = async (text: string): Promise<string[]> => {
+  const parseToItems = async (text: string): Promise<ScheduleHint[]> => {
     if (!text.trim()) return [];
     try {
       const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
-        body: { text },
+        body: { text, today_date: dateKey },
       });
       if (error) throw error;
-      return Array.isArray(data?.items) ? data.items : [];
+      const items = Array.isArray(data?.items) ? data.items : [];
+      return items
+        .filter((i: any) => i && typeof i.text === "string")
+        .map((i: any) => ({ text: i.text, when: typeof i.when === "string" ? i.when : null }));
     } catch (e) {
       console.error("Failed to parse tasks:", e);
       return [];
@@ -109,9 +124,29 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       parseToItems(blockers),
     ]);
 
-    const uniqueCompletedItems = dedupeTaskTexts(completedItems);
-    const uniquePendingItems = dedupeTaskTexts(pendingItems);
-    const uniqueBlockerItems = dedupeTaskTexts(blockerItems);
+    // Dedupe each list while preserving the first when-hint we see for each unique item.
+    const dedupeHints = (items: ScheduleHint[]): ScheduleHint[] => {
+      const out: ScheduleHint[] = [];
+      items.forEach((it) => {
+        if (!it?.text || !it.text.trim()) return;
+        if (out.some((e) => areTaskTextsEquivalent(e.text, it.text))) return;
+        out.push({ text: it.text, when: it.when ?? null });
+      });
+      return out;
+    };
+
+    const uniqueCompletedHints = dedupeHints(completedItems);
+    const uniquePendingHints = dedupeHints([
+      // Prefer schedule from the rich entry parse (which sees full free-text context),
+      // and fall back to per-line schedule from parseToItems(pendingTasks).
+      ...pendingTaskSchedule,
+      ...pendingItems,
+    ]);
+    const uniqueBlockerHints = dedupeHints(blockerItems);
+
+    const uniqueCompletedItems = uniqueCompletedHints.map((h) => h.text);
+    const uniquePendingItems = uniquePendingHints.map((h) => h.text);
+    const uniqueBlockerItems = uniqueBlockerHints.map((h) => h.text);
 
     // Remove only EOD-sourced rows (sections: completed | pending | blocker).
     // Manually added rows live under "pending:manual" and are preserved.
@@ -179,11 +214,12 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       rows.push({ user_id: user.id, task_date: dateKey, section: "completed", task_text: taskText, completed: true });
     });
 
-    uniquePendingItems.forEach((taskText) => {
+    uniquePendingHints.forEach(({ text: taskText, when }) => {
       const normalized = normalizeTaskText(taskText);
       if (completedKeys.has(normalized)) return;
       if (uniqueOpenRows.some((row) => row.section.startsWith("pending") && areTaskTextsEquivalent(row.task_text, taskText))) return;
-      rows.push({ user_id: user.id, task_date: dateKey, section: "pending", task_text: taskText, completed: false });
+      const taskDate = resolveWhenHint(when, date, dateKey);
+      rows.push({ user_id: user.id, task_date: taskDate, section: "pending", task_text: taskText, completed: false });
     });
 
     uniqueBlockerItems.forEach((taskText) => {
