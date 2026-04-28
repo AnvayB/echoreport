@@ -13,6 +13,14 @@ export interface TaskGroup {
   rows: TaskRow[];
 }
 
+export type Bucket = "today" | "tomorrow" | "thisWeek";
+
+export interface PendingByBucket {
+  today: TaskGroup[] | null;
+  tomorrow: TaskGroup[] | null;
+  thisWeek: TaskGroup[] | null;
+}
+
 export interface TasksForTodayContextValue {
   selectedDate: Date;
   todayKey: string;
@@ -23,7 +31,8 @@ export interface TasksForTodayContextValue {
   completedToday: TaskRow[];
   pending: TaskRow[];
   blockers: TaskRow[];
-  pendingGroups: TaskGroup[] | null;
+  pendingByBucket: PendingByBucket;
+  pendingGroups: TaskGroup[] | null; // legacy: flat groups across all buckets
   grouping: boolean;
   savingId: string | null;
   savedId: string | null;
@@ -32,6 +41,7 @@ export interface TasksForTodayContextValue {
   adding: boolean;
   toggleTask: (row: TaskRow) => Promise<void>;
   deleteTask: (row: TaskRow) => Promise<void>;
+  moveTaskToBucket: (row: TaskRow, bucket: Bucket) => Promise<void>;
   addMoreTasks: () => Promise<void>;
   reload: () => Promise<void>;
 }
