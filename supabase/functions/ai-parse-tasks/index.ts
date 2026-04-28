@@ -10,7 +10,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { text } = await req.json();
+    const body = await req.json();
+    const text: string = body?.text;
+    const todayDate: string | undefined = body?.today_date; // YYYY-MM-DD from client (user's locale)
+
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Text is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -20,16 +23,25 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are a productivity assistant. Convert free-form text describing tasks into a clean array of concise, professional task items.
+    const dateContext = todayDate
+      ? `Today's date is ${todayDate} (YYYY-MM-DD).`
+      : "";
 
-You MUST respond with valid JSON only. No markdown, no code fences, no explanation. Use this exact structure:
+    const systemPrompt = `You are a productivity assistant. Convert free-form text describing tasks into a clean array of concise, professional task items, each tagged with WHEN it should happen.
 
-{ "items": ["task 1", "task 2"] }
+${dateContext}
 
-Rules:
-- Each item should be a single, concise, action-oriented task line (no emojis, no bullet markers, no numbering).
+You MUST respond by calling the parse_tasks tool. Rules:
+- Each item is a single, concise, action-oriented task line (no emojis, no bullet markers, no numbering).
 - Split distinct tasks into separate items. Merge duplicate or trivially similar ones.
 - Preserve the user's intent and important specifics, but trim filler words.
+- For each task, set "when":
+  - "today" if the user implies today, ASAP, this morning/afternoon, or gives no time hint at all (default).
+  - "tomorrow" if the user says tomorrow, next day, in the morning (when written at end of day), etc.
+  - "this_week" if the user says this week, later this week, by Friday, by end of week.
+  - A specific "YYYY-MM-DD" if the user names a weekday or date you can resolve (use today's date above as anchor; pick the next occurrence of that weekday).
+  - null if you genuinely cannot tell — caller will default to today.
+- Do NOT invent dates beyond what the text says. When in doubt, prefer "today" over guessing.
 - If no actionable tasks are found, return { "items": [] }.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -44,6 +56,38 @@ Rules:
           { role: "system", content: systemPrompt },
           { role: "user", content: text },
         ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "parse_tasks",
+              description: "Return parsed tasks with when-hints.",
+              parameters: {
+                type: "object",
+                properties: {
+                  items: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        text: { type: "string" },
+                        when: {
+                          type: ["string", "null"],
+                          description: "today | tomorrow | this_week | YYYY-MM-DD | null",
+                        },
+                      },
+                      required: ["text", "when"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["items"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "parse_tasks" } },
       }),
     });
 
@@ -64,18 +108,22 @@ Rules:
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
-
-    let items: string[] = [];
-    try {
-      const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      if (Array.isArray(parsed.items)) {
-        items = parsed.items.filter((i: unknown) => typeof i === "string" && i.trim().length > 0);
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    let items: Array<{ text: string; when: string | null }> = [];
+    if (toolCall?.function?.arguments) {
+      try {
+        const parsed = JSON.parse(toolCall.function.arguments);
+        if (Array.isArray(parsed.items)) {
+          items = parsed.items
+            .filter((i: any) => i && typeof i.text === "string" && i.text.trim().length > 0)
+            .map((i: any) => ({
+              text: i.text.trim(),
+              when: typeof i.when === "string" ? i.when : null,
+            }));
+        }
+      } catch (e) {
+        console.error("Failed to parse tool args:", e);
       }
-    } catch {
-      // Fallback: split by newline
-      items = content.split("\n").map((l: string) => l.replace(/^[-*\d.)\s]+/, "").trim()).filter(Boolean);
     }
 
     return new Response(JSON.stringify({ items }), {
