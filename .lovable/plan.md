@@ -1,80 +1,71 @@
-
-
-# Layout Restructure: Focused "Tasks for Today" + Modal Weekly Report
-
 ## Goal
 
-Reorganize the dashboard so the middle column is laser-focused on what's actionable *right now* (pending tasks + EOD entry), push retrospective sections to the side columns, and turn the weekly report into a centered modal with edit/copy/download.
+Let you drag any pending task into one of three time buckets — **Today**, **Tomorrow**, or **This Week** — while still showing your AI-generated topic groups (e.g. "Databricks Integration", "Jira Sync") inside each bucket.
 
-## New Layout
+## The key idea (how groupings survive)
+
+Time bucket and topic group are **two independent dimensions**:
+
+- **Time bucket** = stored on the task row in the database (the existing `task_date` column already encodes this — today's date = Today, tomorrow = Tomorrow, later this week = This Week).
+- **Topic group** = derived on the fly by the AI from the task text, independent of date.
+
+So when you drag a task from Today → Tomorrow, we just update its `task_date`. The topic groups are recomputed across **all visible pending tasks**, then rendered nested inside each time bucket. Dragging never destroys grouping — it just moves the task to a different bucket, and its topic header re-appears there.
+
+Visual layout in the middle column:
 
 ```text
-┌─────────────────────┬──────────────────────────┬──────────────────────┐
-│ Weekly Calendar     │ Tasks for Today          │ Weekly Report        │
-│ (week nav + days)   │   • Pending for Today    │   [Generate] button  │
-│                     │   • Blockers & Follow-ups│                      │
-├─────────────────────┤                          ├──────────────────────┤
-│ Completed Yesterday │ Daily Entry Panel        │ Completed Today      │
-│ (read-only list)    │ (brain dump + organize)  │ (read-only list)     │
-└─────────────────────┴──────────────────────────┴──────────────────────┘
-
-         Click "Generate Weekly Report" → centered modal:
-         ┌────────────────────────────────────┐
-         │ Weekly Report — <week label>    ✕  │
-         │ ┌────────────────────────────────┐ │
-         │ │ <editable textarea, 20 rows>   │ │
-         │ └────────────────────────────────┘ │
-         │ [Copy] [Download .md] [Regenerate] │
-         │                       [Save Draft] │
-         └────────────────────────────────────┘
+Tasks
+├── Today
+│   ├── Databricks Integration
+│   │   • task A
+│   │   • task B
+│   └── Jira Sync
+│       • task C
+├── Tomorrow
+│   └── ACL Coordination
+│       • task D
+└── This Week
+    └── Hubspot Dataset
+        • task E
 ```
 
-## What Changes
+Drop targets are the **bucket headers** (Today / Tomorrow / This Week). You don't drop into a topic group — the topic group it lands in is decided automatically by the AI grouping pass.
 
-### 1. Split `TasksForToday.tsx` into three render slots
-The component currently renders all four sections (Completed Yesterday, Pending, Blockers, Completed Today) in one card. Refactor it so each section can be rendered independently in different grid columns:
+## What changes
 
-- Introduce a `section` prop: `"pending"` (default — pending + blockers, the "Tasks for Today" header), `"completedYesterday"`, or `"completedToday"`.
-- All data fetching, dedupe, AI grouping, and checkbox-toggle logic stays in one place via a shared hook (`useTasksForToday(selectedDate)`) so the three mounted instances share state and a single set of queries — not three duplicate fetches.
-- Each rendered variant only shows its own section's container (keeps the grey-bg/black-border styling already in place).
+### 1. Provider (`TasksForTodayProvider.tsx`)
+- Widen the pending fetch to also include tasks dated tomorrow and the rest of the current week (not just `<= todayKey`).
+- Split `pending` into three derived buckets by `task_date`: `today`, `tomorrow`, `thisWeek` (rest of current workweek, excluding today/tomorrow).
+- Run AI grouping **once** over the full pending pool, then split each returned group's rows by bucket when rendering. That keeps topic titles consistent across buckets and avoids three separate AI calls.
+- Add `moveTaskToBucket(row, bucket)` — optimistic update of `task_date`, then `update` in Supabase, with rollback on error.
 
-### 2. `Dashboard.tsx` grid restructure
-Change the three columns so each is a vertical stack:
+### 2. UI (`TasksForToday.tsx`)
+- Render three labeled bucket sections inside "Tasks for Today" (rename card to just "Tasks"). Each bucket lists its topic groups → tasks.
+- Make each task row draggable (HTML5 drag-and-drop, no new dependency).
+- Make each bucket header a drop zone with hover highlight.
+- Keep existing checkbox / X / "saved" affordances unchanged.
 
-- **Left column**: Week nav + `WeekDayCard` list, then `<TasksForToday section="completedYesterday" />` underneath.
-- **Middle column**: `<TasksForToday section="pending" />` (header reads "Tasks for Today", contains pending + blockers + "Add more tasks"), then `<DailyEntryPanel />` underneath.
-- **Right column**: `<WeeklyReportGenerator />` (now just a trigger card), then `<TasksForToday section="completedToday" />` underneath.
+### 3. Context type (`TasksForTodayContext.ts`)
+- Replace `pending` / `pendingGroups` with `pendingByBucket: { today, tomorrow, thisWeek }` where each bucket is `TaskGroup[]`.
+- Add `moveTaskToBucket` to the context value.
 
-Selected-day state and `loadEntries` callback stay in `Dashboard` and are passed down unchanged.
+### 4. Completed Yesterday / Completed Today
+- Unchanged.
 
-### 3. `WeeklyReportGenerator.tsx` becomes a modal trigger
-- The card now shows just the title + a single "Generate Weekly Report" button.
-- Clicking it opens a `Dialog` (shadcn `dialog.tsx` — already in the project) sized `max-w-3xl`, containing:
-  - Header: "Weekly Report — <week label>"
-  - Loading spinner while generating
-  - Editable `Textarea` (20 rows, mono font) once draft arrives
-  - Footer actions: **Copy**, **Download .md**, **Regenerate**, **Save Draft**
-- Modal stays open across regenerate/save so the user can iterate. Closing the modal preserves the in-memory draft for that session.
+## Edge cases handled
 
-### 4. New "Download .md" action
-- Generate a `Blob` from the current draft text with type `text/markdown`.
-- Filename: `weekly-report-<week-start-key>.md` (e.g. `weekly-report-2026-04-20.md`).
-- Trigger download via a temporary `<a>` element — no dependency added.
+- **Overdue tasks** (dated before today, still pending): roll into the **Today** bucket automatically, same as today's behavior.
+- **Past today's week**: when you navigate to a future week, "This Week" is computed relative to `selectedDate`'s week.
+- **Drag within same bucket**: no-op.
+- **Failed save**: optimistic move reverts and shows a toast.
+- **AI grouping latency**: while grouping is in flight, tasks render flat under their bucket (no topic headers yet), then re-render grouped — same UX pattern you have today.
 
-## Technical Notes
+## Open question
 
-- **No DB or edge-function changes.** Pure UI restructure.
-- **Shared task state**: extracting a `useTasksForToday` hook is required to avoid three independent fetches and three independent AI-grouping calls when the same component is mounted three times. The hook owns: rows, AI groups, loading flags, and the `toggleTask` / `addTasks` mutations. The three section variants subscribe to the same hook instance via React context (a small `TasksForTodayProvider` mounted once in `Dashboard`, wrapping the three columns).
-- **Section visibility rules unchanged**: "Completed Yesterday" still only renders when `selectedDate` is today; "Completed Today" still only renders when there are completed-today rows. When hidden, that grid slot collapses (no empty bordered box).
-- **Responsive**: on `md` (2-col) and below, the three columns stack as before — the side sections appear after their parent column's primary content, so the reading order remains: calendar → completed yesterday → tasks for today → daily entry → weekly report → completed today.
-- **Modal accessibility**: shadcn `Dialog` provides focus trap, ESC-to-close, and overlay click-to-close out of the box.
+Should **This Week** include only the remaining workdays of the current week (Wed–Fri if today is Tue), or also spill into next week if you've dragged something further out? The simplest first pass: only the current workweek. We can extend to a "Later" bucket later if useful.
 
-## Files Changed
+## Out of scope
 
-| File | Change |
-|---|---|
-| `src/components/TasksForToday.tsx` | Add `section` prop; extract data/mutations into a context-backed hook so multiple mounted instances share state. |
-| `src/components/TasksForTodayProvider.tsx` *(new)* | Provider + `useTasksForToday` hook owning fetch, dedupe, AI grouping, toggle, add. |
-| `src/pages/Dashboard.tsx` | Wrap columns in provider; place three `<TasksForToday section=…/>` instances in the new layout. |
-| `src/components/WeeklyReportGenerator.tsx` | Convert inline card body to a `Dialog`-based modal; add Download .md action. |
-
+- Reordering tasks within a group (drag handle for sort order).
+- Dragging directly onto a specific topic group to force a category.
+- Mobile touch drag (HTML5 DnD works on desktop; we can add `@dnd-kit` later if you want touch support).
