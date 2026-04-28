@@ -1,14 +1,16 @@
-import { useEffect, useState, ReactNode } from "react";
+import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { getPreviousWorkday, formatDateKey } from "@/lib/weekUtils";
+import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { dedupeTaskTexts, mergeDuplicateTaskRows } from "@/lib/taskUtils";
 import { toast } from "sonner";
-import { isSameDay } from "date-fns";
+import { addDays, isSameDay } from "date-fns";
 import {
   TasksForTodayContext,
   type TaskRow,
   type TaskGroup,
+  type Bucket,
+  type PendingByBucket,
 } from "./TasksForTodayContext";
 
 export { useTasksForToday } from "./TasksForTodayContext";
@@ -23,6 +25,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const { user } = useAuth();
   const today = selectedDate ?? new Date();
   const todayKey = formatDateKey(today);
+  const tomorrowKey = formatDateKey(addDays(today, 1));
+  const weekEndKey = getWeekEndKey(today); // Friday of selected week
   const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
 
   const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
@@ -45,8 +49,9 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
 
     const [completedRes, pendingRes, blockerRes, completedTodayRes] = await Promise.all([
       supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("task_date", prevKey).eq("completed", true),
-      supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", false).in("section", ["pending", "pending:manual"]).lte("task_date", todayKey).order("task_date", { ascending: true }),
-      supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", false).eq("section", "blocker").lte("task_date", todayKey).order("task_date", { ascending: true }),
+      // Pending: anything not completed up through end of this week (overdue + today + tomorrow + this week)
+      supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", false).in("section", ["pending", "pending:manual"]).lte("task_date", weekEndKey).order("task_date", { ascending: true }),
+      supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", false).eq("section", "blocker").lte("task_date", weekEndKey).order("task_date", { ascending: true }),
       supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("task_date", todayKey).eq("completed", true),
     ]);
 
@@ -90,21 +95,19 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       setPendingGroups([{ title: "General", rows: pending }]);
       return;
     }
-    // If current groups already cover a superset of the current pending IDs,
-    // just filter them in place — no need to re-run the AI grouping.
+    // Optimistic in-place filter when only removals happened.
     const currentIds = new Set(pending.map((r) => r.id));
     setPendingGroups((prev) => {
       if (!prev) return prev;
       const groupedIds = new Set(prev.flatMap((g) => g.rows.map((r) => r.id)));
       const allCovered = [...currentIds].every((id) => groupedIds.has(id));
-      if (!allCovered) return prev; // new ids exist → fall through to AI regroup below
+      if (!allCovered) return prev;
       const filtered = prev
         .map((g) => ({ ...g, rows: g.rows.filter((r) => currentIds.has(r.id)) }))
         .filter((g) => g.rows.length > 0);
       return filtered;
     });
 
-    // Only call AI re-grouping when there are NEW pending ids not yet grouped.
     const existingGroupedIds = new Set(
       (pendingGroups ?? []).flatMap((g) => g.rows.map((r) => r.id))
     );
@@ -144,6 +147,35 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingIdsKey]);
+
+  // Slice pending tasks (and their topic groups) into time buckets by task_date.
+  const bucketOf = (dateKey: string): Bucket => {
+    if (dateKey <= todayKey) return "today"; // includes overdue
+    if (dateKey === tomorrowKey) return "tomorrow";
+    return "thisWeek";
+  };
+
+  const pendingByBucket: PendingByBucket = useMemo(() => {
+    const empty = { today: [] as TaskGroup[], tomorrow: [] as TaskGroup[], thisWeek: [] as TaskGroup[] };
+    if (pending.length === 0) {
+      return { today: null, tomorrow: null, thisWeek: null };
+    }
+    // Use AI-derived groups if available; otherwise fall back to a single "General" group.
+    const groups: TaskGroup[] = pendingGroups ?? [{ title: "General", rows: pending }];
+    groups.forEach((g) => {
+      const splits: Record<Bucket, TaskRow[]> = { today: [], tomorrow: [], thisWeek: [] };
+      g.rows.forEach((r) => splits[bucketOf(r.task_date)].push(r));
+      (Object.keys(splits) as Bucket[]).forEach((b) => {
+        if (splits[b].length > 0) empty[b].push({ title: g.title, rows: splits[b] });
+      });
+    });
+    return {
+      today: empty.today,
+      tomorrow: empty.tomorrow,
+      thisWeek: empty.thisWeek,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, pendingGroups, todayKey, tomorrowKey]);
 
   const toggleTask = async (row: TaskRow) => {
     if (!user) return;
@@ -213,6 +245,37 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     toast.success("Task removed");
   };
 
+  const moveTaskToBucket = async (row: TaskRow, bucket: Bucket) => {
+    if (!user) return;
+    const targetDate =
+      bucket === "today" ? todayKey
+        : bucket === "tomorrow" ? tomorrowKey
+        : weekEndKey; // place "this week" tasks at end of workweek
+    const currentBucket = bucketOf(row.task_date);
+    if (currentBucket === bucket && row.task_date === targetDate) return;
+
+    const prev = pending;
+    setPending((list) =>
+      list.map((r) => (r.id === row.id ? { ...r, task_date: targetDate } : r))
+    );
+    // Update topic groups in place so the row keeps the same group title, just under a new bucket.
+    setPendingGroups((groups) =>
+      groups
+        ? groups.map((g) => ({
+            ...g,
+            rows: g.rows.map((r) => (r.id === row.id ? { ...r, task_date: targetDate } : r)),
+          }))
+        : groups
+    );
+
+    const { error } = await supabase.from("daily_tasks").update({ task_date: targetDate }).eq("id", row.id);
+    if (error) {
+      toast.error("Couldn't move task");
+      setPending(prev);
+      return;
+    }
+  };
+
   const addMoreTasks = async () => {
     if (!user) return;
     const text = newTasksText.trim();
@@ -261,6 +324,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         completedToday,
         pending,
         blockers,
+        pendingByBucket,
         pendingGroups,
         grouping,
         savingId,
@@ -270,6 +334,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         adding,
         toggleTask,
         deleteTask,
+        moveTaskToBucket,
         addMoreTasks,
         reload: load,
       }}

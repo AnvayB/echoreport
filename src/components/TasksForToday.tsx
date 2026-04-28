@@ -1,32 +1,57 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical,
 } from "lucide-react";
-import { useTasksForToday, type TaskRow } from "./TasksForTodayContext";
+import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
 }
 
+const BUCKET_LABELS: Record<Bucket, string> = {
+  today: "Today",
+  tomorrow: "Tomorrow",
+  thisWeek: "This Week",
+};
+
 const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const {
     loading, loaded,
     completedYesterday, completedToday, pending, blockers,
-    pendingGroups, grouping,
+    pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
-    toggleTask, deleteTask, addMoreTasks, reload,
+    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload,
     isViewingToday,
   } = useTasksForToday();
+
+  const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const renderCheckboxRow = (row: TaskRow) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
+    const isDragging = draggingId === row.id;
     return (
-      <label key={row.id} className="flex items-start gap-2 cursor-pointer group">
+      <label
+        key={row.id}
+        draggable
+        onDragStart={(e) => {
+          setDraggingId(row.id);
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", row.id);
+        }}
+        onDragEnd={() => {
+          setDraggingId(null);
+          setDragOverBucket(null);
+        }}
+        className={`flex items-start gap-1.5 cursor-pointer group transition-opacity ${isDragging ? "opacity-40" : ""}`}
+      >
+        <GripVertical className="h-3.5 w-3.5 mt-0.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing" />
         <Checkbox
           checked={row.completed}
           onCheckedChange={() => toggleTask(row)}
@@ -60,6 +85,63 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           <X className="h-3.5 w-3.5" />
         </button>
       </label>
+    );
+  };
+
+  const renderBucket = (bucket: Bucket, groups: TaskGroup[] | null) => {
+    const isOver = dragOverBucket === bucket;
+    const hasItems = !!groups && groups.length > 0;
+    return (
+      <div
+        key={bucket}
+        onDragOver={(e) => {
+          if (!draggingId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (dragOverBucket !== bucket) setDragOverBucket(bucket);
+        }}
+        onDragLeave={(e) => {
+          // Only clear if leaving the bucket entirely
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          if (dragOverBucket === bucket) setDragOverBucket(null);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData("text/plain");
+          const row = pending.find((r) => r.id === id);
+          setDragOverBucket(null);
+          setDraggingId(null);
+          if (row) moveTaskToBucket(row, bucket);
+        }}
+        className={`rounded-lg border p-3 transition-colors ${
+          isOver
+            ? "border-primary bg-primary/5"
+            : "border-foreground bg-muted/50"
+        }`}
+      >
+        <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
+          {BUCKET_LABELS[bucket]}
+          {bucket === "today" && grouping && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
+        </p>
+        {!hasItems ? (
+          <p className="text-xs text-muted-foreground italic py-1">
+            {isOver ? "Drop here" : "Drag tasks here"}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {groups!.map((g, gi) => (
+              <div key={gi} className="pl-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                  {g.title}
+                </p>
+                <div className="space-y-1.5">{g.rows.map(renderCheckboxRow)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -125,14 +207,14 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     );
   }
 
-  // ─── Default: pending + blockers + add-more ──────────────────
+  // ─── Default: pending buckets + blockers + add-more ──────────
   const isEmpty = loaded && pending.length === 0 && blockers.length === 0;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ListTodo className="h-5 w-5" /> Tasks for Today
+          <ListTodo className="h-5 w-5" /> Tasks
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -147,28 +229,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           </p>
         )}
         {loaded && !isEmpty && (
-          <div className="space-y-5">
-            {pending.length > 0 && (
-              <div className="rounded-lg border border-foreground bg-muted/50 p-3">
-                <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
-                  Pending for Today
-                  {grouping && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                </p>
-                {pendingGroups ? (
-                  <div className="space-y-3">
-                    {pendingGroups.map((g, gi) => (
-                      <div key={gi} className="pl-1">
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
-                          {g.title}
-                        </p>
-                        <div className="space-y-1.5">{g.rows.map(renderCheckboxRow)}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">{pending.map(renderCheckboxRow)}</div>
-                )}
-              </div>
+          <div className="space-y-3">
+            {(["today", "tomorrow", "thisWeek"] as Bucket[]).map((b) =>
+              renderBucket(b, pendingByBucket[b])
             )}
             {blockers.length > 0 && (
               <div className="rounded-lg border border-foreground bg-muted/50 p-3">
