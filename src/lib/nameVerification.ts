@@ -1,0 +1,111 @@
+// Client-side cache + AI verification for name candidates.
+// Stores per-token verdicts in localStorage so repeat tokens are instant.
+
+import { supabase } from "@/integrations/supabase/client";
+
+const STORAGE_KEY = "nameVerify.v1";
+const MAX_CACHE = 1000;
+
+type Verdict = "name" | "not_name";
+type CacheShape = Record<string, Verdict>;
+
+let cache: CacheShape | null = null;
+const subscribers = new Set<() => void>();
+const inFlight = new Set<string>();
+
+function loadCache(): CacheShape {
+  if (cache) return cache;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    cache = raw ? (JSON.parse(raw) as CacheShape) : {};
+  } catch {
+    cache = {};
+  }
+  return cache!;
+}
+
+function persist() {
+  if (!cache) return;
+  try {
+    // Cap cache size — drop oldest-ish (just slice keys).
+    const keys = Object.keys(cache);
+    if (keys.length > MAX_CACHE) {
+      const trimmed: CacheShape = {};
+      for (const k of keys.slice(-MAX_CACHE)) trimmed[k] = cache[k];
+      cache = trimmed;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+  } catch {
+    /* ignore */
+  }
+}
+
+function notify() {
+  subscribers.forEach((cb) => cb());
+}
+
+export function subscribeNameVerify(cb: () => void): () => void {
+  subscribers.add(cb);
+  return () => subscribers.delete(cb);
+}
+
+/** Returns: true = verified name, false = verified not-name, undefined = unknown */
+export function getVerdict(token: string): boolean | undefined {
+  const c = loadCache();
+  const v = c[normalize(token)];
+  if (v === "name") return true;
+  if (v === "not_name") return false;
+  return undefined;
+}
+
+function normalize(t: string): string {
+  return t.trim();
+}
+
+/** Submit candidate tokens for AI classification. Debounced/batched. */
+let queue: Set<string> = new Set();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function verifyCandidates(tokens: string[]) {
+  const c = loadCache();
+  let added = false;
+  for (const raw of tokens) {
+    const t = normalize(raw);
+    if (!t) continue;
+    if (c[t] !== undefined) continue;
+    if (inFlight.has(t)) continue;
+    queue.add(t);
+    added = true;
+  }
+  if (!added) return;
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(flush, 400);
+}
+
+async function flush() {
+  flushTimer = null;
+  if (queue.size === 0) return;
+  const batch = Array.from(queue);
+  queue = new Set();
+  batch.forEach((t) => inFlight.add(t));
+
+  try {
+    const { data, error } = await supabase.functions.invoke("ai-classify-names", {
+      body: { candidates: batch },
+    });
+    if (error) throw error;
+    const names: string[] = Array.isArray(data?.names) ? data.names : [];
+    const nameSet = new Set(names.map(normalize));
+    const c = loadCache();
+    for (const t of batch) {
+      c[t] = nameSet.has(t) ? "name" : "not_name";
+    }
+    persist();
+    notify();
+  } catch (e) {
+    console.warn("name verification failed", e);
+    // Don't cache failures — let them retry next render.
+  } finally {
+    batch.forEach((t) => inFlight.delete(t));
+  }
+}
