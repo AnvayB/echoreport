@@ -32,11 +32,17 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   const [pendingTaskSchedule, setPendingTaskSchedule] = useState<ScheduleHint[]>([]);
 
   const dateKey = formatDateKey(date);
+  const draftStorageKey = user ? `dailyEntry.freeText.${user.id}.${dateKey}` : null;
 
   // Reset and load when date changes
   useEffect(() => {
     if (!user) return;
-    setFreeText("");
+    // Restore unsaved free-text draft for this date (survives tab switches / unmount).
+    let restoredDraft = "";
+    try {
+      restoredDraft = draftStorageKey ? localStorage.getItem(draftStorageKey) ?? "" : "";
+    } catch { /* ignore */ }
+    setFreeText(restoredDraft);
     setAccomplishments("");
     setPendingTasks("");
     setBlockers("");
@@ -62,7 +68,16 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
           }
         }
       });
-  }, [user, dateKey]);
+  }, [user, dateKey, draftStorageKey]);
+
+  // Persist free-text draft as the user types so it survives tab switches.
+  useEffect(() => {
+    if (!draftStorageKey) return;
+    try {
+      if (freeText) localStorage.setItem(draftStorageKey, freeText);
+      else localStorage.removeItem(draftStorageKey);
+    } catch { /* ignore */ }
+  }, [freeText, draftStorageKey]);
 
   const handleParse = async () => {
     if (!freeText.trim()) {
@@ -86,6 +101,8 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
         : [];
       setPendingTaskSchedule(schedule);
       setParsed(true);
+      // Clear saved draft now that it's been organized into structured fields.
+      try { if (draftStorageKey) localStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
     } catch (e) {
       console.error(e);
       toast.error("Failed to parse entry. You can edit the fields manually.");
