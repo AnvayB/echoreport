@@ -4,35 +4,23 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Save } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Save, LayoutTemplate, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { TEMPLATE_PRESETS, type TemplatePreset } from "@/lib/templatePresets";
 
-const DEFAULT_TEMPLATE = `Subject: Weekly Status Update - [Week Range]
-
-Hi team,
-
-Here is my weekly status update:
-
-## Highlights
-[Key accomplishments this week]
-
-## Challenges / Blockers
-[Any issues encountered]
-
-## Completed Tasks
-[Detailed list of completed work]
-
-## Carry-over / Next Week
-[Tasks remaining for next week]
-
-Best regards`;
+const DEFAULT_TEMPLATE = TEMPLATE_PRESETS[0].template;
 
 const SettingsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [saving, setSaving] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
+  const [selectedPreview, setSelectedPreview] = useState<TemplatePreset | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -61,6 +49,13 @@ const SettingsPage = () => {
     }
   };
 
+  const applyPreset = (preset: TemplatePreset) => {
+    setTemplate(preset.template);
+    setPresetsOpen(false);
+    setSelectedPreview(null);
+    toast.success(`Loaded "${preset.name}" template`);
+  };
+
   return (
     <div className="mx-auto max-w-2xl p-4">
       <Card>
@@ -76,6 +71,74 @@ const SettingsPage = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Email Template</p>
+            <Dialog open={presetsOpen} onOpenChange={setPresetsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <LayoutTemplate className="mr-2 h-4 w-4" />
+                  Browse Examples
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Template Examples</DialogTitle>
+                  <DialogDescription>
+                    Pick a starting point. Loading a preset replaces your current template — you can edit it after.
+                  </DialogDescription>
+                </DialogHeader>
+
+                {!selectedPreview ? (
+                  <div className="grid gap-2 max-h-[60vh] overflow-y-auto pr-1">
+                    {TEMPLATE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        onClick={() => setSelectedPreview(preset)}
+                        className="text-left rounded-lg border bg-card p-3 hover:bg-accent transition-colors"
+                      >
+                        <div className="font-medium text-sm">{preset.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {preset.description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="font-medium text-sm">{selectedPreview.name}</div>
+                      <div className="text-xs text-muted-foreground">{selectedPreview.description}</div>
+                    </div>
+                    <Textarea
+                      value={selectedPreview.template}
+                      readOnly
+                      rows={14}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                )}
+
+                <DialogFooter className="gap-2">
+                  {selectedPreview ? (
+                    <>
+                      <Button variant="ghost" onClick={() => setSelectedPreview(null)}>
+                        Back
+                      </Button>
+                      <Button onClick={() => applyPreset(selectedPreview)}>
+                        <Check className="mr-2 h-4 w-4" />
+                        Use this template
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="ghost" onClick={() => setPresetsOpen(false)}>
+                      Cancel
+                    </Button>
+                  )}
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
           <Textarea
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
