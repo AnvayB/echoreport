@@ -95,10 +95,16 @@ async function flush() {
     });
     if (error) throw error;
     const names: string[] = Array.isArray(data?.names) ? data.names : [];
+    const notNames: string[] = Array.isArray(data?.notNames) ? data.notNames : [];
     const nameSet = new Set(names.map(normalize));
+    const notNameSet = new Set(notNames.map(normalize));
     const c = loadCache();
     for (const t of batch) {
-      c[t] = nameSet.has(t) ? "name" : "not_name";
+      // Prefer explicit verdicts from server; fall back to "not_name" for
+      // anything in the batch the server didn't return (defensive).
+      if (nameSet.has(t)) c[t] = "name";
+      else if (notNameSet.has(t)) c[t] = "not_name";
+      else c[t] = "not_name";
     }
     persist();
     notify();
