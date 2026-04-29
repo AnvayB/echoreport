@@ -1,5 +1,8 @@
 // Classifies a list of candidate tokens as person names vs not.
-// Returns { names: string[] } — the subset that ARE person first/full names.
+// Uses a per-user persistent cache (known_names table) so AI runs only once per token per user.
+// Returns { names: string[], notNames: string[] } — covering ALL inputs that have a verdict.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +16,7 @@ Deno.serve(async (req) => {
   try {
     const { candidates } = await req.json();
     if (!Array.isArray(candidates) || candidates.length === 0) {
-      return new Response(JSON.stringify({ names: [] }), {
+      return new Response(JSON.stringify({ names: [], notNames: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -26,6 +29,55 @@ Deno.serve(async (req) => {
           .filter((c) => c.length > 0 && c.length < 80),
       ),
     ).slice(0, 200);
+
+    // ── Per-user persistent cache lookup ──────────────────────────────
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseAnon, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    let userId: string | null = null;
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      userId = userData.user?.id ?? null;
+    } catch {
+      userId = null;
+    }
+
+    const cachedNames = new Set<string>();
+    const cachedNotNames = new Set<string>();
+    let toClassify = unique;
+
+    if (userId) {
+      const { data: cached, error: cacheErr } = await supabase
+        .from("known_names")
+        .select("token, is_name")
+        .in("token", unique);
+      if (cacheErr) {
+        console.warn("known_names lookup error", cacheErr);
+      } else if (cached) {
+        for (const row of cached) {
+          if (row.is_name) cachedNames.add(row.token);
+          else cachedNotNames.add(row.token);
+        }
+        toClassify = unique.filter(
+          (t) => !cachedNames.has(t) && !cachedNotNames.has(t),
+        );
+      }
+    }
+
+    // If everything is cached, return early — no AI call needed.
+    if (toClassify.length === 0) {
+      return new Response(
+        JSON.stringify({
+          names: Array.from(cachedNames),
+          notNames: Array.from(cachedNotNames),
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
@@ -47,7 +99,7 @@ Deno.serve(async (req) => {
           {
             role: "user",
             content:
-              `Classify these tokens. Return only those that are person names:\n${JSON.stringify(unique)}`,
+              `Classify these tokens. Return only those that are person names:\n${JSON.stringify(toClassify)}`,
           },
         ],
         tools: [
@@ -98,20 +150,43 @@ Deno.serve(async (req) => {
 
     const data = await resp.json();
     const call = data?.choices?.[0]?.message?.tool_calls?.[0];
-    let names: string[] = [];
+    const aiNames = new Set<string>();
     try {
       const args = JSON.parse(call?.function?.arguments ?? "{}");
       if (Array.isArray(args.names)) {
-        const inputSet = new Set(unique);
-        names = args.names.filter((n: unknown): n is string => typeof n === "string" && inputSet.has(n));
+        const inputSet = new Set(toClassify);
+        for (const n of args.names) {
+          if (typeof n === "string" && inputSet.has(n)) aiNames.add(n);
+        }
       }
     } catch (e) {
       console.error("Failed to parse tool args", e);
     }
 
-    return new Response(JSON.stringify({ names }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Persist verdicts for this user (best-effort).
+    if (userId) {
+      const rows = toClassify.map((token) => ({
+        user_id: userId,
+        token,
+        is_name: aiNames.has(token),
+      }));
+      const { error: upsertErr } = await supabase
+        .from("known_names")
+        .upsert(rows, { onConflict: "user_id,token" });
+      if (upsertErr) console.warn("known_names upsert error", upsertErr);
+    }
+
+    // Merge cached + freshly classified into the response.
+    const names = new Set<string>([...cachedNames, ...aiNames]);
+    const notNames = new Set<string>([
+      ...cachedNotNames,
+      ...toClassify.filter((t) => !aiNames.has(t)),
+    ]);
+
+    return new Response(
+      JSON.stringify({ names: Array.from(names), notNames: Array.from(notNames) }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     console.error("classify-names error", e);
     return new Response(
