@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -16,12 +19,36 @@ interface WeeklyReportGeneratorProps {
   currentWeek: Date;
 }
 
+interface ReportTemplate {
+  id: string;
+  name: string;
+  template: string;
+  is_default: boolean;
+}
+
 const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   const { user } = useAuth();
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("report_templates")
+      .select("id, name, template, is_default")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        const list = (data ?? []) as ReportTemplate[];
+        setTemplates(list);
+        const def = list.find((t) => t.is_default) ?? list[0];
+        if (def) setSelectedTemplateId(def.id);
+      });
+  }, [user]);
 
   const generate = async () => {
     if (!user) return;
@@ -31,11 +58,10 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     const dates = weekdays.map(formatDateKey);
     const weekEndKey = getWeekEndKey(currentWeek);
 
-    const [entriesRes, completedTasksRes, pendingTasksRes, settingsRes] = await Promise.all([
+    const [entriesRes, completedTasksRes, pendingTasksRes] = await Promise.all([
       supabase.from("daily_entries").select("*").eq("user_id", user.id).in("entry_date", dates).order("entry_date"),
       supabase.from("daily_tasks").select("task_date, section, task_text, completed").eq("user_id", user.id).in("task_date", dates).eq("completed", true).order("task_date"),
       supabase.from("daily_tasks").select("task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).lte("task_date", weekEndKey).order("task_date"),
-      supabase.from("user_settings").select("email_template").eq("user_id", user.id).maybeSingle(),
     ]);
 
     const allTasks = dedupeTaskRows([
@@ -43,12 +69,14 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
       ...(pendingTasksRes.data || []),
     ]);
 
+    const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+
     try {
       const { data, error } = await supabase.functions.invoke("ai-weekly-report", {
         body: {
           entries: entriesRes.data || [],
           tasks: allTasks,
-          emailTemplate: settingsRes.data?.email_template || "",
+          emailTemplate: selectedTemplate?.template || "",
           weekLabel: formatWeekLabel(currentWeek),
         },
       });
