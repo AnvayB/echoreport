@@ -101,6 +101,8 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
         : [];
       setPendingTaskSchedule(schedule);
       setParsed(true);
+      // Clear saved draft now that it's been organized into structured fields.
+      try { if (draftStorageKey) localStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
     } catch (e) {
       console.error(e);
       toast.error("Failed to parse entry. You can edit the fields manually.");
