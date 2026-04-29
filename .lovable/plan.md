@@ -1,71 +1,53 @@
 ## Goal
 
-Let you drag any pending task into one of three time buckets — **Today**, **Tomorrow**, or **This Week** — while still showing your AI-generated topic groups (e.g. "Databricks Integration", "Jira Sync") inside each bucket.
+When a task mentions a person (e.g. "Email Sarah about Q3 plan", "Sync with Marcus"), wrap their name in a small pill outline so communication-with-people tasks visually stand out.
 
-## The key idea (how groupings survive)
+## Approach
 
-Time bucket and topic group are **two independent dimensions**:
+Use a lightweight client-side renderer — no AI round-trip, no DB changes. Detect proper-noun name candidates with a regex + filter, then render the task text as a mix of plain `<span>`s and pill `<span>`s.
 
-- **Time bucket** = stored on the task row in the database (the existing `task_date` column already encodes this — today's date = Today, tomorrow = Tomorrow, later this week = This Week).
-- **Topic group** = derived on the fly by the AI from the task text, independent of date.
+## What gets a pill
 
-So when you drag a task from Today → Tomorrow, we just update its `task_date`. The topic groups are recomputed across **all visible pending tasks**, then rendered nested inside each time bucket. Dragging never destroys grouping — it just moves the task to a different bucket, and its topic header re-appears there.
+A token is treated as a name if it:
+- Starts with a capital letter followed by lowercase letters (e.g. `Sarah`, `Marcus`, `O'Neil`, `María`)
+- Optionally extends to a second capitalized word for first+last (e.g. `Sarah Chen`)
+- Is **not** in a stop-list of common capitalized non-names (weekdays, months, products, generic words that often start sentences, and acronyms like `EOD`, `Q3`, `AI`, `PR`, `API`, `CEO`, etc.)
+- Is **not** the first word of the task (sentence-initial capitalization is ambiguous — e.g. "Email Sarah" → "Email" skipped, "Sarah" pilled). Exception: if a clear communication verb precedes it (`email`, `call`, `message`, `text`, `dm`, `slack`, `ping`, `sync with`, `meet`, `follow up with`, `ask`, `tell`, `remind`, `update`), we trust the cap.
 
-Visual layout in the middle column:
+Multi-word names: greedily merge two adjacent capitalized tokens into one pill when both pass filters.
+
+## Files
+
+**New:** `src/lib/nameHighlight.ts`
+- `tokenizeWithNames(text: string): Array<{ type: "text" | "name"; value: string }>`
+- Exports the stop-list and communication-verb list as constants for easy tuning.
+
+**New:** `src/components/TaskText.tsx`
+- Tiny component that takes `text` and renders the tokens, wrapping name tokens in:
+  ```tsx
+  <span className="inline-flex items-center rounded-full border border-primary/60 px-1.5 py-0 text-[0.78em] font-medium text-primary bg-primary/5 mx-0.5 leading-snug">
+    {value}
+  </span>
+  ```
+  Uses `text-[0.78em]` so the pill scales relative to surrounding text and doesn't break line-height.
+
+**Edit:** `src/components/TasksForToday.tsx`
+- Replace the three places task text is rendered (`renderCheckboxRow` pending row, completed-yesterday row, completed-today row) — swap `{row.task_text}` for `<TaskText text={row.task_text} />`.
+- Keep the `line-through text-muted-foreground` styling on the wrapping `<span>`; pills inherit muted color via `currentColor`-friendly classes when completed (we'll add a `muted` prop to `TaskText` and dim the pill border/text for completed rows).
+
+**Edit:** `src/lib/nameHighlight.test.ts` (new, optional but nice)
+- A few unit tests covering: "Email Sarah" → pill on Sarah only; "Sync with John Smith" → one pill on "John Smith"; "Update Q3 roadmap" → no pills; "Monday standup" → no pills; "Ask Maria and Tom" → two pills.
+
+## Visual
 
 ```text
-Tasks
-├── Today
-│   ├── Databricks Integration
-│   │   • task A
-│   │   • task B
-│   └── Jira Sync
-│       • task C
-├── Tomorrow
-│   └── ACL Coordination
-│       • task D
-└── This Week
-    └── Hubspot Dataset
-        • task E
+Before:  ☐ ⋮ Email Sarah about the Q3 roadmap                      ✕
+After:   ☐ ⋮ Email (Sarah) about the Q3 roadmap                    ✕
+                    └ rounded pill, primary outline
 ```
-
-Drop targets are the **bucket headers** (Today / Tomorrow / This Week). You don't drop into a topic group — the topic group it lands in is decided automatically by the AI grouping pass.
-
-## What changes
-
-### 1. Provider (`TasksForTodayProvider.tsx`)
-- Widen the pending fetch to also include tasks dated tomorrow and the rest of the current week (not just `<= todayKey`).
-- Split `pending` into three derived buckets by `task_date`: `today`, `tomorrow`, `thisWeek` (rest of current workweek, excluding today/tomorrow).
-- Run AI grouping **once** over the full pending pool, then split each returned group's rows by bucket when rendering. That keeps topic titles consistent across buckets and avoids three separate AI calls.
-- Add `moveTaskToBucket(row, bucket)` — optimistic update of `task_date`, then `update` in Supabase, with rollback on error.
-
-### 2. UI (`TasksForToday.tsx`)
-- Render three labeled bucket sections inside "Tasks for Today" (rename card to just "Tasks"). Each bucket lists its topic groups → tasks.
-- Make each task row draggable (HTML5 drag-and-drop, no new dependency).
-- Make each bucket header a drop zone with hover highlight.
-- Keep existing checkbox / X / "saved" affordances unchanged.
-
-### 3. Context type (`TasksForTodayContext.ts`)
-- Replace `pending` / `pendingGroups` with `pendingByBucket: { today, tomorrow, thisWeek }` where each bucket is `TaskGroup[]`.
-- Add `moveTaskToBucket` to the context value.
-
-### 4. Completed Yesterday / Completed Today
-- Unchanged.
-
-## Edge cases handled
-
-- **Overdue tasks** (dated before today, still pending): roll into the **Today** bucket automatically, same as today's behavior.
-- **Past today's week**: when you navigate to a future week, "This Week" is computed relative to `selectedDate`'s week.
-- **Drag within same bucket**: no-op.
-- **Failed save**: optimistic move reverts and shows a toast.
-- **AI grouping latency**: while grouping is in flight, tasks render flat under their bucket (no topic headers yet), then re-render grouped — same UX pattern you have today.
-
-## Open question
-
-Should **This Week** include only the remaining workdays of the current week (Wed–Fri if today is Tue), or also spill into next week if you've dragged something further out? The simplest first pass: only the current workweek. We can extend to a "Later" bucket later if useful.
 
 ## Out of scope
 
-- Reordering tasks within a group (drag handle for sort order).
-- Dragging directly onto a specific topic group to force a category.
-- Mobile touch drag (HTML5 DnD works on desktop; we can add `@dnd-kit` later if you want touch support).
+- No AI-based entity recognition (keeps it instant + free).
+- No persistence of who-is-mentioned. If you later want filtering ("show all tasks involving Sarah"), we can add a derived index then.
+- No avatar/colored-by-person — pills are uniform primary outline.
