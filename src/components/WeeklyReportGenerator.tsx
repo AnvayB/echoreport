@@ -138,8 +138,22 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
             <FileText className="h-5 w-5" /> Weekly Report
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Button onClick={openAndGenerate} className="w-full">
+        <CardContent className="space-y-2">
+          {templates.length > 1 && (
+            <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a template" />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}{t.is_default ? " (default)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={openAndGenerate} className="w-full" disabled={!selectedTemplateId}>
             Generate Weekly Report
           </Button>
         </CardContent>
