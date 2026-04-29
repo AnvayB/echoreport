@@ -7,6 +7,7 @@ import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical,
 } from "lucide-react";
 import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
+import TaskText from "./TaskText";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
@@ -63,7 +64,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             row.completed ? "line-through text-muted-foreground" : "text-foreground"
           }`}
         >
-          {row.task_text}
+          <TaskText text={row.task_text} muted={row.completed} />
         </span>
         {isSaving && <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />}
         {isSaved && !isSaving && (
@@ -161,7 +162,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               {completedYesterday.map((row) => (
                 <div key={row.id} className="flex items-start gap-2">
                   <CircleCheckBig className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm leading-snug text-muted-foreground">{row.task_text}</span>
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    <TaskText text={row.task_text} muted />
+                  </span>
                 </div>
               ))}
             </div>
@@ -193,7 +196,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                     disabled={savingId === row.id}
                   />
                   <span className="text-sm leading-snug line-through text-muted-foreground flex-1">
-                    {row.task_text}
+                    <TaskText text={row.task_text} muted />
                   </span>
                   {savingId === row.id && (
                     <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />
