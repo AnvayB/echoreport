@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
 import TaskText from "./TaskText";
+import VoiceInput from "./VoiceInput";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
@@ -246,9 +247,12 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         )}
         {loaded && (
           <div className="mt-4 space-y-2 border-t border-border pt-4">
-            <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <Plus className="h-4 w-4" /> Add More Tasks
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <Plus className="h-4 w-4" /> Add More Tasks
+              </label>
+              <VoiceInput onTranscript={(t) => setNewTasksText(newTasksText ? newTasksText + " " + t : t)} />
+            </div>
             <Textarea
               value={newTasksText}
               onChange={(e) => setNewTasksText(e.target.value)}
