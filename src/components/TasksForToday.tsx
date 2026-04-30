@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
 import TaskText from "./TaskText";
+import VoiceInput from "./VoiceInput";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
