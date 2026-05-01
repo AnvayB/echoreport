@@ -180,9 +180,6 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
           )}
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex flex-wrap gap-2">
-              <Button onClick={copyToClipboard} variant="outline" size="sm" disabled={!draft || loading}>
-                <Copy className="mr-2 h-4 w-4" /> Copy
-              </Button>
               <Button onClick={downloadMarkdown} variant="outline" size="sm" disabled={!draft || loading}>
                 <Download className="mr-2 h-4 w-4" /> Download .md
               </Button>
@@ -190,8 +187,8 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
                 Regenerate
               </Button>
             </div>
-            <Button onClick={saveDraft} disabled={saving || !draft || loading} size="sm">
-              <Save className="mr-2 h-4 w-4" /> {saving ? "Saving…" : "Save Draft"}
+            <Button onClick={copyToClipboard} disabled={!draft || loading} size="sm">
+              <Copy className="mr-2 h-4 w-4" /> Copy
             </Button>
           </DialogFooter>
         </DialogContent>
