@@ -349,6 +349,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         grouping,
         savingId,
         savedId,
+        bucketLabels,
         newTasksText,
         setNewTasksText,
         adding,
