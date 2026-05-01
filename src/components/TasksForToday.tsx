@@ -116,7 +116,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         }`}
       >
         <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
-          {BUCKET_LABELS[bucket]}
+          {bucketLabels[bucket]}
           {bucket === "today" && grouping && (
             <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
           )}
