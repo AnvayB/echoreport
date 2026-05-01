@@ -95,23 +95,6 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     if (!draft) await generate();
   };
 
-  const saveDraft = async () => {
-    if (!user) return;
-    setSaving(true);
-    const { error } = await supabase.from("weekly_reports").upsert(
-      {
-        user_id: user.id,
-        week_start: getWeekStartKey(currentWeek),
-        week_end: getWeekEndKey(currentWeek),
-        report_draft: draft,
-      },
-      { onConflict: "user_id,week_start" }
-    );
-    setSaving(false);
-    if (error) toast.error("Failed to save draft");
-    else toast.success("Draft saved");
-  };
-
   const copyToClipboard = () => {
     navigator.clipboard.writeText(draft);
     toast.success("Copied to clipboard");
