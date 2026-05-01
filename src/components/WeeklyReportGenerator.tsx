@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
 import { dedupeTaskRows } from "@/lib/taskUtils";
-import { Loader2, FileText, Copy, Save, Download } from "lucide-react";
+import { Loader2, FileText, Copy, Download } from "lucide-react";
 import { toast } from "sonner";
 
 interface WeeklyReportGeneratorProps {
