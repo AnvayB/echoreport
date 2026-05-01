@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
 import { dedupeTaskRows } from "@/lib/taskUtils";
-import { Loader2, FileText, Copy, Save, Download } from "lucide-react";
+import { Loader2, FileText, Copy, Download } from "lucide-react";
 import { toast } from "sonner";
 
 interface WeeklyReportGeneratorProps {
@@ -30,7 +30,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   const { user } = useAuth();
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -93,23 +93,6 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   const openAndGenerate = async () => {
     setOpen(true);
     if (!draft) await generate();
-  };
-
-  const saveDraft = async () => {
-    if (!user) return;
-    setSaving(true);
-    const { error } = await supabase.from("weekly_reports").upsert(
-      {
-        user_id: user.id,
-        week_start: getWeekStartKey(currentWeek),
-        week_end: getWeekEndKey(currentWeek),
-        report_draft: draft,
-      },
-      { onConflict: "user_id,week_start" }
-    );
-    setSaving(false);
-    if (error) toast.error("Failed to save draft");
-    else toast.success("Draft saved");
   };
 
   const copyToClipboard = () => {
@@ -180,9 +163,6 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
           )}
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex flex-wrap gap-2">
-              <Button onClick={copyToClipboard} variant="outline" size="sm" disabled={!draft || loading}>
-                <Copy className="mr-2 h-4 w-4" /> Copy
-              </Button>
               <Button onClick={downloadMarkdown} variant="outline" size="sm" disabled={!draft || loading}>
                 <Download className="mr-2 h-4 w-4" /> Download .md
               </Button>
@@ -190,8 +170,8 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
                 Regenerate
               </Button>
             </div>
-            <Button onClick={saveDraft} disabled={saving || !draft || loading} size="sm">
-              <Save className="mr-2 h-4 w-4" /> {saving ? "Saving…" : "Save Draft"}
+            <Button onClick={copyToClipboard} disabled={!draft || loading} size="sm">
+              <Copy className="mr-2 h-4 w-4" /> Copy
             </Button>
           </DialogFooter>
         </DialogContent>
