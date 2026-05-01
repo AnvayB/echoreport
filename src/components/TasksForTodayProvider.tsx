@@ -26,8 +26,17 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const { user } = useAuth();
   const today = selectedDate ?? new Date();
   const todayKey = formatDateKey(today);
-  const tomorrowKey = formatDateKey(addDays(today, 1));
-  const weekEndKey = getWeekEndKey(today); // Friday of selected week
+  const isFriday = today.getDay() === 5;
+  // On Fridays, "Tomorrow" rolls to Monday and "This Week" rolls to next workweek.
+  const tomorrowKey = formatDateKey(addDays(today, isFriday ? 3 : 1));
+  const weekEndKey = isFriday
+    ? getWeekEndKey(addDays(today, 7))
+    : getWeekEndKey(today);
+  const bucketLabels: Record<Bucket, string> = {
+    today: "Today",
+    tomorrow: isFriday ? "Monday" : "Tomorrow",
+    thisWeek: isFriday ? "Next Week" : "This Week",
+  };
   const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
 
   const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
@@ -340,6 +349,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         grouping,
         savingId,
         savedId,
+        bucketLabels,
         newTasksText,
         setNewTasksText,
         adding,

@@ -14,12 +14,6 @@ interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
 }
 
-const BUCKET_LABELS: Record<Bucket, string> = {
-  today: "Today",
-  tomorrow: "Tomorrow",
-  thisWeek: "This Week",
-};
-
 const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const {
     loading, loaded,
@@ -28,7 +22,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload,
-    isViewingToday,
+    isViewingToday, bucketLabels,
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
@@ -122,7 +116,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         }`}
       >
         <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
-          {BUCKET_LABELS[bucket]}
+          {bucketLabels[bucket]}
           {bucket === "today" && grouping && (
             <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
           )}

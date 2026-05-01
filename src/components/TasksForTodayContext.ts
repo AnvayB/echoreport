@@ -36,6 +36,7 @@ export interface TasksForTodayContextValue {
   grouping: boolean;
   savingId: string | null;
   savedId: string | null;
+  bucketLabels: Record<Bucket, string>;
   newTasksText: string;
   setNewTasksText: (v: string) => void;
   adding: boolean;
