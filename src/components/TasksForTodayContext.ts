@@ -38,7 +38,7 @@ export interface TasksForTodayContextValue {
   savedId: string | null;
   bucketLabels: Record<Bucket, string>;
   newTasksText: string;
-  setNewTasksText: (v: string) => void;
+  setNewTasksText: React.Dispatch<React.SetStateAction<string>>;
   adding: boolean;
   toggleTask: (row: TaskRow) => Promise<void>;
   deleteTask: (row: TaskRow) => Promise<void>;
