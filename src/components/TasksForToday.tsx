@@ -245,7 +245,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <Plus className="h-4 w-4" /> Add More Tasks
               </label>
-              <VoiceInput onTranscript={(t) => setNewTasksText(newTasksText ? newTasksText + " " + t : t)} />
+              <VoiceInput onTranscript={(t) => setNewTasksText((prev) => (prev ? prev + " " + t : t))} />
             </div>
             <Textarea
               value={newTasksText}
