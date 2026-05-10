@@ -26,16 +26,18 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const { user } = useAuth();
   const today = selectedDate ?? new Date();
   const todayKey = formatDateKey(today);
-  const isFriday = today.getDay() === 5;
-  // On Fridays, "Tomorrow" rolls to Monday and "This Week" rolls to next workweek.
-  const tomorrowKey = formatDateKey(addDays(today, isFriday ? 3 : 1));
-  const weekEndKey = isFriday
+  const dow = today.getDay(); // 0=Sun … 6=Sat
+  // On Fri/Sat/Sun, "Tomorrow" rolls to next Monday and "This Week" rolls to next workweek's Friday.
+  const isEndOfWeek = dow === 5 || dow === 6 || dow === 0;
+  const tomorrowOffset = dow === 5 ? 3 : dow === 6 ? 2 : dow === 0 ? 1 : 1;
+  const tomorrowKey = formatDateKey(addDays(today, tomorrowOffset));
+  const weekEndKey = isEndOfWeek
     ? getWeekEndKey(addDays(today, 7))
     : getWeekEndKey(today);
   const bucketLabels: Record<Bucket, string> = {
     today: "Today",
-    tomorrow: isFriday ? "Monday" : "Tomorrow",
-    thisWeek: isFriday ? "Next Week" : "This Week",
+    tomorrow: isEndOfWeek ? "Monday" : "Tomorrow",
+    thisWeek: isEndOfWeek ? "Next Week" : "This Week",
   };
   const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
 
