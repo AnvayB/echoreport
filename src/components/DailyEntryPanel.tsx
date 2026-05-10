@@ -21,6 +21,7 @@ interface DailyEntryPanelProps {
 const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   const { user } = useAuth();
   const [freeText, setFreeText] = useState("");
+  const [interimVoiceText, setInterimVoiceText] = useState("");
   const [accomplishments, setAccomplishments] = useState("");
   const [pendingTasks, setPendingTasks] = useState("");
   const [blockers, setBlockers] = useState("");
@@ -321,7 +322,10 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
                 <p className="text-sm text-muted-foreground">
                   What did you get done? Any challenges? What's next?
                 </p>
-                <VoiceInput onTranscript={(t) => setFreeText((prev) => (prev ? prev + " " + t : t))} />
+                <VoiceInput
+                  onTranscript={(t) => setFreeText((prev) => (prev ? prev + " " + t : t))}
+                  onInterimTranscript={setInterimVoiceText}
+                />
               </div>
               <Textarea
                 value={freeText}
@@ -329,6 +333,9 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
                 placeholder="Brain-dump everything here — the AI will organize it for you."
                 rows={6}
               />
+              {interimVoiceText && (
+                <p className="text-sm text-muted-foreground italic px-1">{interimVoiceText}</p>
+              )}
             </div>
             <Button onClick={handleParse} disabled={parsing || !freeText.trim()} className="w-full">
               {parsing ? (
