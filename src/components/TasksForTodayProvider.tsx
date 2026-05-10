@@ -12,6 +12,7 @@ import {
   type TaskGroup,
   type Bucket,
   type PendingByBucket,
+  type DuplicateCluster,
 } from "./TasksForTodayContext";
 
 export { useTasksForToday } from "./TasksForTodayContext";
