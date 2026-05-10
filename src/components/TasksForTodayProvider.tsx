@@ -54,6 +54,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [savedId, setSavedId] = useState<string | null>(null);
   const [newTasksText, setNewTasksText] = useState("");
   const [adding, setAdding] = useState(false);
+  const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
+  const [dismissedDuplicateKeys, setDismissedDuplicateKeys] = useState<Set<string>>(new Set());
 
   const load = async () => {
     if (!user) return;
