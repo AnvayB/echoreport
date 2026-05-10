@@ -46,6 +46,9 @@ export interface TasksForTodayContextValue {
   newTasksText: string;
   setNewTasksText: React.Dispatch<React.SetStateAction<string>>;
   adding: boolean;
+  duplicateClusters: DuplicateCluster[];
+  resolveDuplicateCluster: (key: string, keepId: string) => Promise<void>;
+  dismissDuplicateCluster: (key: string) => void;
   toggleTask: (row: TaskRow) => Promise<void>;
   deleteTask: (row: TaskRow) => Promise<void>;
   moveTaskToBucket: (row: TaskRow, bucket: Bucket) => Promise<void>;
