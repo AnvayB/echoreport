@@ -13,6 +13,12 @@ export interface TaskGroup {
   rows: TaskRow[];
 }
 
+export interface DuplicateCluster {
+  key: string;
+  reason: string;
+  rows: TaskRow[];
+}
+
 export type Bucket = "today" | "tomorrow" | "thisWeek";
 
 export interface PendingByBucket {
