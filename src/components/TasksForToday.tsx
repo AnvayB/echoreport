@@ -23,6 +23,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload,
     isViewingToday, bucketLabels,
+    duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
