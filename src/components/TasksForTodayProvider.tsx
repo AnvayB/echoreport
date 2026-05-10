@@ -436,6 +436,9 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         moveTaskToBucket,
         addMoreTasks,
         reload: load,
+        duplicateClusters: visibleDuplicateClusters,
+        resolveDuplicateCluster,
+        dismissDuplicateCluster,
       }}
     >
       {children}
