@@ -235,10 +235,10 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 {duplicateClusters.map((cluster) => (
                   <div
                     key={cluster.key}
-                    className="rounded-lg border border-warning/50 bg-warning/5 p-3 space-y-2"
+                    className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-2"
                   >
                     <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 mt-0.5 text-warning shrink-0" />
+                      <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground">Possible duplicate</p>
                         {cluster.reason && (
