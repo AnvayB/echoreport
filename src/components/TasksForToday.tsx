@@ -27,6 +27,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [interimVoiceText, setInterimVoiceText] = useState("");
 
   const renderCheckboxRow = (row: TaskRow) => {
     const isSaving = savingId === row.id;
@@ -245,7 +246,10 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <Plus className="h-4 w-4" /> Add More Tasks
               </label>
-              <VoiceInput onTranscript={(t) => setNewTasksText((prev) => (prev ? prev + " " + t : t))} />
+              <VoiceInput
+                onTranscript={(t) => setNewTasksText((prev) => (prev ? prev + " " + t : t))}
+                onInterimTranscript={setInterimVoiceText}
+              />
             </div>
             <Textarea
               value={newTasksText}
@@ -254,6 +258,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               className="min-h-[60px]"
               disabled={adding}
             />
+            {interimVoiceText && (
+              <p className="text-sm text-muted-foreground italic px-1">{interimVoiceText}</p>
+            )}
             <div className="flex items-center gap-2">
               <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
                 {adding ? (

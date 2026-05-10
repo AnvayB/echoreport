@@ -17,6 +17,7 @@ interface DailyEntryFormProps {
 const DailyEntryForm = ({ date, onBack }: DailyEntryFormProps) => {
   const { user } = useAuth();
   const [freeText, setFreeText] = useState("");
+  const [interimVoiceText, setInterimVoiceText] = useState("");
   const [accomplishments, setAccomplishments] = useState("");
   const [pendingTasks, setPendingTasks] = useState("");
   const [blockers, setBlockers] = useState("");
@@ -131,7 +132,10 @@ const DailyEntryForm = ({ date, onBack }: DailyEntryFormProps) => {
                 <p className="text-sm text-muted-foreground">
                   What did you get done today? Any challenges? What's planned for tomorrow?
                 </p>
-                <VoiceInput onTranscript={(t) => setFreeText((prev) => (prev ? prev + " " + t : t))} />
+                <VoiceInput
+                  onTranscript={(t) => setFreeText((prev) => (prev ? prev + " " + t : t))}
+                  onInterimTranscript={setInterimVoiceText}
+                />
               </div>
               <Textarea
                 value={freeText}
@@ -139,6 +143,9 @@ const DailyEntryForm = ({ date, onBack }: DailyEntryFormProps) => {
                 placeholder="Just brain-dump everything here — what you accomplished, any blockers, what's left for tomorrow. The AI will organize it for you."
                 rows={8}
               />
+              {interimVoiceText && (
+                <p className="text-sm text-muted-foreground italic px-1">{interimVoiceText}</p>
+              )}
             </div>
             <Button onClick={handleParse} disabled={parsing || !freeText.trim()} className="w-full">
               {parsing ? (
