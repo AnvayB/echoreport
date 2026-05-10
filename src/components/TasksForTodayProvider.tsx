@@ -163,6 +163,79 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingIdsKey]);
 
+  // Detect semantic duplicates across pending + blockers via AI.
+  const detectKey = [...pending, ...blockers].map((r) => r.id).sort().join("|");
+  useEffect(() => {
+    const candidates = [...pending, ...blockers];
+    if (candidates.length < 2) {
+      setDuplicateClusters([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-detect-duplicate-tasks", {
+          body: { tasks: candidates.map((r) => ({ id: r.id, task_text: r.task_text })) },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        const raw: Array<{ task_ids: string[]; reason: string }> = Array.isArray(data?.clusters) ? data.clusters : [];
+        const byId = new Map(candidates.map((r) => [r.id, r]));
+        const clusters: DuplicateCluster[] = raw
+          .map((c) => {
+            const rows = (c.task_ids || [])
+              .map((id) => byId.get(id))
+              .filter((r): r is TaskRow => Boolean(r));
+            const key = [...rows.map((r) => r.id)].sort().join("|");
+            return { key, reason: c.reason || "Possible duplicate", rows };
+          })
+          .filter((c) => c.rows.length >= 2);
+        setDuplicateClusters(clusters);
+      } catch (e) {
+        console.error("Failed to detect duplicate tasks:", e);
+        if (!cancelled) setDuplicateClusters([]);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectKey]);
+
+  const visibleDuplicateClusters = useMemo(
+    () => duplicateClusters.filter((c) => !dismissedDuplicateKeys.has(c.key)),
+    [duplicateClusters, dismissedDuplicateKeys]
+  );
+
+  const dismissDuplicateCluster = (key: string) => {
+    setDismissedDuplicateKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
+
+  const resolveDuplicateCluster = async (key: string, keepId: string) => {
+    const cluster = duplicateClusters.find((c) => c.key === key);
+    if (!cluster) return;
+    const losingIds = cluster.rows.map((r) => r.id).filter((id) => id !== keepId);
+    if (losingIds.length === 0) return;
+
+    const prevPending = pending;
+    const prevBlockers = blockers;
+    setPending((list) => list.filter((r) => !losingIds.includes(r.id)));
+    setBlockers((list) => list.filter((r) => !losingIds.includes(r.id)));
+    setDuplicateClusters((list) => list.filter((c) => c.key !== key));
+
+    const { error } = await supabase.from("daily_tasks").delete().in("id", losingIds);
+    if (error) {
+      toast.error("Couldn't remove duplicates");
+      setPending(prevPending);
+      setBlockers(prevBlockers);
+      return;
+    }
+    toast.success(losingIds.length === 1 ? "Duplicate removed" : `${losingIds.length} duplicates removed`);
+  };
+
+
   // Slice pending tasks (and their topic groups) into time buckets by task_date.
   const bucketOf = (dateKey: string): Bucket => {
     if (dateKey <= todayKey) return "today"; // includes overdue
