@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle,
 } from "lucide-react";
 import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
 import TaskText from "./TaskText";
@@ -23,6 +23,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload,
     isViewingToday, bucketLabels,
+    duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
@@ -229,6 +230,50 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         )}
         {loaded && !isEmpty && (
           <div className="space-y-3">
+            {duplicateClusters.length > 0 && (
+              <div className="space-y-2">
+                {duplicateClusters.map((cluster) => (
+                  <div
+                    key={cluster.key}
+                    className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-2"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Possible duplicate</p>
+                        {cluster.reason && (
+                          <p className="text-xs text-muted-foreground">{cluster.reason}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => dismissDuplicateCluster(cluster.key)}
+                        className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
+                      >
+                        Keep both
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 pl-6">
+                      {cluster.rows.map((row) => (
+                        <div key={row.id} className="flex items-start gap-2">
+                          <span className="text-sm leading-snug text-foreground flex-1">
+                            <TaskText text={row.task_text} />
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs shrink-0"
+                            onClick={() => resolveDuplicateCluster(cluster.key, row.id)}
+                          >
+                            Keep this one
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {(["today", "tomorrow", "thisWeek"] as Bucket[]).map((b) =>
               renderBucket(b, pendingByBucket[b])
             )}

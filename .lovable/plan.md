@@ -1,53 +1,57 @@
 ## Goal
 
-When a task mentions a person (e.g. "Email Sarah about Q3 plan", "Sync with Marcus"), wrap their name in a small pill outline so communication-with-people tasks visually stand out.
+Detect when the task list contains **duplicate or near-duplicate tasks** (including semantic duplicates worded differently), flag them in the UI, and let the user choose to **delete one** or **keep both**.
+
+## Why the current logic misses them
+
+`mergeDuplicateTaskRows` (in `src/lib/taskUtils.ts`) only matches tasks that share many literal tokens. Real-world duplicates in the list use different wording, e.g.:
+
+- "Enhance Project Hub user interface" ↔ "improve Project Hub UI"
+- "Add Customer Projects to the CSP main page" ↔ "Display Customer Projects on CSP homepage"
+
+Token-overlap rules can't catch these. Detection needs to be **semantic** (AI-powered).
 
 ## Approach
 
-Use a lightweight client-side renderer — no AI round-trip, no DB changes. Detect proper-noun name candidates with a regex + filter, then render the task text as a mix of plain `<span>`s and pill `<span>`s.
+### 1. New edge function: `ai-detect-duplicate-tasks`
 
-## What gets a pill
-
-A token is treated as a name if it:
-- Starts with a capital letter followed by lowercase letters (e.g. `Sarah`, `Marcus`, `O'Neil`, `María`)
-- Optionally extends to a second capitalized word for first+last (e.g. `Sarah Chen`)
-- Is **not** in a stop-list of common capitalized non-names (weekdays, months, products, generic words that often start sentences, and acronyms like `EOD`, `Q3`, `AI`, `PR`, `API`, `CEO`, etc.)
-- Is **not** the first word of the task (sentence-initial capitalization is ambiguous — e.g. "Email Sarah" → "Email" skipped, "Sarah" pilled). Exception: if a clear communication verb precedes it (`email`, `call`, `message`, `text`, `dm`, `slack`, `ping`, `sync with`, `meet`, `follow up with`, `ask`, `tell`, `remind`, `update`), we trust the cap.
-
-Multi-word names: greedily merge two adjacent capitalized tokens into one pill when both pass filters.
-
-## Files
-
-**New:** `src/lib/nameHighlight.ts`
-- `tokenizeWithNames(text: string): Array<{ type: "text" | "name"; value: string }>`
-- Exports the stop-list and communication-verb list as constants for easy tuning.
-
-**New:** `src/components/TaskText.tsx`
-- Tiny component that takes `text` and renders the tokens, wrapping name tokens in:
-  ```tsx
-  <span className="inline-flex items-center rounded-full border border-primary/60 px-1.5 py-0 text-[0.78em] font-medium text-primary bg-primary/5 mx-0.5 leading-snug">
-    {value}
-  </span>
+- Input: `{ tasks: [{ id, task_text }] }` (the current pending + blockers, scoped per user).
+- Calls Lovable AI Gateway (`google/gemini-3-flash-preview`) with a tool-call schema returning:
+  ```json
+  { "clusters": [ { "task_ids": ["...","..."], "reason": "short why" } ] }
   ```
-  Uses `text-[0.78em]` so the pill scales relative to surrounding text and doesn't break line-height.
+- System prompt: "Group tasks that describe the same intended work, even if worded differently. Only return clusters of 2+. Skip tasks that are merely related but distinct."
+- Validates: every id exists in input, no id appears in two clusters, clusters have ≥2 ids.
 
-**Edit:** `src/components/TasksForToday.tsx`
-- Replace the three places task text is rendered (`renderCheckboxRow` pending row, completed-yesterday row, completed-today row) — swap `{row.task_text}` for `<TaskText text={row.task_text} />`.
-- Keep the `line-through text-muted-foreground` styling on the wrapping `<span>`; pills inherit muted color via `currentColor`-friendly classes when completed (we'll add a `muted` prop to `TaskText` and dim the pill border/text for completed rows).
+### 2. Provider wiring (`TasksForTodayProvider.tsx`)
 
-**Edit:** `src/lib/nameHighlight.test.ts` (new, optional but nice)
-- A few unit tests covering: "Email Sarah" → pill on Sarah only; "Sync with John Smith" → one pill on "John Smith"; "Update Q3 roadmap" → no pills; "Monday standup" → no pills; "Ask Maria and Tom" → two pills.
+- After `pending`/`blockers` load, debounce-call the new function (similar pattern to existing `ai-group-tasks` effect, keyed on `pendingIdsKey`).
+- Store results as `duplicateClusters: Array<{ key, reason, rows: TaskRow[] }>` in state.
+- Track `dismissedClusterKeys: Set<string>` in component state for "Keep both" decisions (session-only — re-flagging next reload is acceptable; we can persist later if needed).
+- Add to context:
+  - `duplicateClusters`
+  - `dismissDuplicateCluster(key)` → adds key to dismissed set
+  - `resolveDuplicateCluster(key, keepId)` → deletes the other rows in that cluster from `daily_tasks` and updates local `pending`/`blockers` state (with optimistic update + rollback on error, mirroring `deleteTask`).
 
-## Visual
+### 3. UI (`src/components/TasksForToday.tsx`)
 
-```text
-Before:  ☐ ⋮ Email Sarah about the Q3 roadmap                      ✕
-After:   ☐ ⋮ Email (Sarah) about the Q3 roadmap                    ✕
-                    └ rounded pill, primary outline
-```
+Add a `DuplicatesAlert` block at the top of the default `pending` section (only when `duplicateClusters.length > 0`):
 
-## Out of scope
+- Card styled with `border-warning` / `bg-muted/50` and an `AlertTriangle` icon — uses semantic tokens.
+- One row per cluster:
+  - Header: "Possible duplicate" + small reason text.
+  - List of the duplicate task texts, each with a **Keep this one** button (calls `resolveDuplicateCluster(key, row.id)`).
+  - A **Keep both** button on the cluster (calls `dismissDuplicateCluster(key)`).
 
-- No AI-based entity recognition (keeps it instant + free).
-- No persistence of who-is-mentioned. If you later want filtering ("show all tasks involving Sarah"), we can add a derived index then.
-- No avatar/colored-by-person — pills are uniform primary outline.
+### 4. Out of scope
+
+- No DB schema changes.
+- Don't touch the existing `mergeDuplicateTaskRows` literal-dedupe — it still safely catches exact dupes silently and shouldn't conflict (semantic clusters will only surface remaining near-duplicates).
+- No persistence of "Keep both" decisions across reloads (can be added later if it becomes annoying).
+
+## Files touched
+
+- `supabase/functions/ai-detect-duplicate-tasks/index.ts` (new)
+- `src/components/TasksForTodayContext.ts` (extend context type)
+- `src/components/TasksForTodayProvider.tsx` (detect, resolve, dismiss)
+- `src/components/TasksForToday.tsx` (render duplicate alerts)
