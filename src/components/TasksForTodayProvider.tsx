@@ -410,6 +410,30 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
   };
 
+  const setTaskImportant = async (row: TaskRow, important: boolean) => {
+    if (!user) return;
+    if (isTaskImportant(row.task_text) === important) return;
+    const newText = setTaskImportantText(row.task_text, important);
+    const updater = (list: TaskRow[]) =>
+      list.map((r) => (r.id === row.id ? { ...r, task_text: newText } : r));
+    const prevPending = pending;
+    const prevBlockers = blockers;
+    setPending(updater);
+    setBlockers(updater);
+
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update({ task_text: newText })
+      .eq("id", row.id);
+    if (error) {
+      toast.error("Couldn't update task");
+      setPending(prevPending);
+      setBlockers(prevBlockers);
+      return;
+    }
+    toast.success(important ? "Marked as important" : "Importance removed");
+  };
+
   return (
     <TasksForTodayContext.Provider
       value={{
