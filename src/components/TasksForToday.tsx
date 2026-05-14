@@ -50,9 +50,11 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
     const isDragging = draggingId === row.id;
+    const important = isTaskImportant(row.task_text);
     return (
+      <ContextMenu key={row.id}>
+        <ContextMenuTrigger asChild>
       <label
-        key={row.id}
         draggable
         onDragStart={(e) => {
           setDraggingId(row.id);
