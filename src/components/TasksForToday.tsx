@@ -125,7 +125,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
           <ContextMenuItem onSelect={() => setTaskImportant(row, !important)}>
-            {important ? "Remove important" : "Mark as important"}
+            {important ? "Mark as unimportant" : "Mark as important"}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
