@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant } from "@/lib/taskUtils";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
