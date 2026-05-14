@@ -40,7 +40,7 @@ const TaskText = ({ text, muted = false }: TaskTextProps) => {
   }, [tokens]);
 
   return (
-    <>
+    <span className={isImportant ? "font-bold" : undefined}>
       {tokens.map((tok, i) => {
         if (tok.type === "text") return <span key={i}>{tok.value}</span>;
 
