@@ -7,7 +7,11 @@ import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
+import { isTaskImportant } from "@/lib/taskUtils";
 import TaskText from "./TaskText";
 import VoiceInput from "./VoiceInput";
 
@@ -22,7 +26,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
-    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload,
+    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant,
     isViewingToday, bucketLabels,
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
@@ -46,9 +50,11 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
     const isDragging = draggingId === row.id;
+    const important = isTaskImportant(row.task_text);
     return (
+      <ContextMenu key={row.id}>
+        <ContextMenuTrigger asChild>
       <label
-        key={row.id}
         draggable
         onDragStart={(e) => {
           setDraggingId(row.id);
@@ -116,6 +122,13 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           <X className="h-3.5 w-3.5" />
         </button>
       </label>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem onSelect={() => setTaskImportant(row, !important)}>
+            {important ? "Remove important" : "Mark as important"}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   };
 

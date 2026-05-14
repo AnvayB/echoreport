@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { tokenizeWithNames } from "@/lib/nameHighlight";
+import { IMPORTANT_PREFIX_REGEX } from "@/lib/taskUtils";
 import {
   getVerdict,
   subscribeNameVerify,
@@ -12,8 +13,7 @@ interface TaskTextProps {
 }
 
 const TaskText = ({ text, muted = false }: TaskTextProps) => {
-  // Detect importance marker: leading "!!" or a standalone "IMPORTANT" word the AI didn't strip.
-  const importantMatch = /^\s*(?:!!\s*|important[:\s-]+)/i.exec(text);
+  const importantMatch = IMPORTANT_PREFIX_REGEX.exec(text);
   const isImportant = !!importantMatch;
   const displayText = isImportant ? text.slice(importantMatch![0].length) : text;
   const tokens = useMemo(() => tokenizeWithNames(displayText), [displayText]);

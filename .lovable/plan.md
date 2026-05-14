@@ -1,57 +1,55 @@
 ## Goal
 
-Detect when the task list contains **duplicate or near-duplicate tasks** (including semantic duplicates worded differently), flag them in the UI, and let the user choose to **delete one** or **keep both**.
+Add a right-click (context) menu to each task row in the task list, starting with the ability to toggle a task's IMPORTANT status. The menu is built so more actions can be slotted in later without restructuring.
 
-## Why the current logic misses them
+## Scope
 
-`mergeDuplicateTaskRows` (in `src/lib/taskUtils.ts`) only matches tasks that share many literal tokens. Real-world duplicates in the list use different wording, e.g.:
+- Applies to pending task rows (Today / Tomorrow / This Week buckets) and Blockers.
+- Out of scope for now: completed-task rows. Easy to extend later.
 
-- "Enhance Project Hub user interface" ↔ "improve Project Hub UI"
-- "Add Customer Projects to the CSP main page" ↔ "Display Customer Projects on CSP homepage"
+## Behavior
 
-Token-overlap rules can't catch these. Detection needs to be **semantic** (AI-powered).
+Right-clicking (or long-pressing on touch) a task opens a small menu next to the cursor with:
 
-## Approach
+1. **Mark as important** — when the task is not yet important.
+2. **Remove important** — when the task is already important.
 
-### 1. New edge function: `ai-detect-duplicate-tasks`
+Selecting the action immediately:
+- Updates the task text in the database (prepends or strips the `!! ` marker that `TaskText` already renders as bold).
+- Optimistically updates local state so the row re-bolds/un-bolds without a refetch.
 
-- Input: `{ tasks: [{ id, task_text }] }` (the current pending + blockers, scoped per user).
-- Calls Lovable AI Gateway (`google/gemini-3-flash-preview`) with a tool-call schema returning:
-  ```json
-  { "clusters": [ { "task_ids": ["...","..."], "reason": "short why" } ] }
-  ```
-- System prompt: "Group tasks that describe the same intended work, even if worded differently. Only return clusters of 2+. Skip tasks that are merely related but distinct."
-- Validates: every id exists in input, no id appears in two clusters, clusters have ≥2 ids.
+Failure path: on DB error, revert the optimistic change and show a toast.
 
-### 2. Provider wiring (`TasksForTodayProvider.tsx`)
+The existing left-click checkbox toggle, drag-to-move, and X-to-delete behaviors remain unchanged.
 
-- After `pending`/`blockers` load, debounce-call the new function (similar pattern to existing `ai-group-tasks` effect, keyed on `pendingIdsKey`).
-- Store results as `duplicateClusters: Array<{ key, reason, rows: TaskRow[] }>` in state.
-- Track `dismissedClusterKeys: Set<string>` in component state for "Keep both" decisions (session-only — re-flagging next reload is acceptable; we can persist later if needed).
-- Add to context:
-  - `duplicateClusters`
-  - `dismissDuplicateCluster(key)` → adds key to dismissed set
-  - `resolveDuplicateCluster(key, keepId)` → deletes the other rows in that cluster from `daily_tasks` and updates local `pending`/`blockers` state (with optimistic update + rollback on error, mirroring `deleteTask`).
+## Future-ready menu items (stubs only — not built yet)
 
-### 3. UI (`src/components/TasksForToday.tsx`)
+The menu component will be structured so we can later add items like:
+- Move to Today / Tomorrow / This Week
+- Duplicate task
+- Copy task text
+- Convert to / from Blocker
 
-Add a `DuplicatesAlert` block at the top of the default `pending` section (only when `duplicateClusters.length > 0`):
+These are placeholders for the "maybe other features" you mentioned — none are implemented in this round.
 
-- Card styled with `border-warning` / `bg-muted/50` and an `AlertTriangle` icon — uses semantic tokens.
-- One row per cluster:
-  - Header: "Possible duplicate" + small reason text.
-  - List of the duplicate task texts, each with a **Keep this one** button (calls `resolveDuplicateCluster(key, row.id)`).
-  - A **Keep both** button on the cluster (calls `dismissDuplicateCluster(key)`).
+## Technical notes
 
-### 4. Out of scope
-
-- No DB schema changes.
-- Don't touch the existing `mergeDuplicateTaskRows` literal-dedupe — it still safely catches exact dupes silently and shouldn't conflict (semantic clusters will only surface remaining near-duplicates).
-- No persistence of "Keep both" decisions across reloads (can be added later if it becomes annoying).
+- Use the existing shadcn `ContextMenu` primitive (`src/components/ui/context-menu.tsx` is already in the project).
+- Wrap each task row in `TasksForToday.tsx` `renderCheckboxRow` with `<ContextMenu>` / `<ContextMenuTrigger asChild>` so the existing `<label>` keeps its drag/click behavior.
+- Add a `setTaskImportant(row, important: boolean)` method to `TasksForTodayProvider` that:
+  - Computes the new `task_text` (`!! ` prefix add/strip, idempotent — also strips a leading literal `IMPORTANT` token if present).
+  - Updates `pending` and `blockers` state arrays optimistically.
+  - Calls `supabase.from("daily_tasks").update({ task_text }).eq("id", row.id)`.
+  - Reverts state and toasts on error.
+- Expose it through `TasksForTodayContext` and consume in `TasksForToday.tsx`.
+- Detection of "is important" reuses the same regex `TaskText` uses (`/^\s*(?:!!\s*|important[:\s-]+)/i`) — extracted into a tiny helper in `src/lib/taskUtils.ts` so both renderer and provider stay in sync.
 
 ## Files touched
 
-- `supabase/functions/ai-detect-duplicate-tasks/index.ts` (new)
-- `src/components/TasksForTodayContext.ts` (extend context type)
-- `src/components/TasksForTodayProvider.tsx` (detect, resolve, dismiss)
-- `src/components/TasksForToday.tsx` (render duplicate alerts)
+- `src/lib/taskUtils.ts` — add `isTaskImportant` + `toggleImportantInText` helpers.
+- `src/components/TaskText.tsx` — use the shared helper (no behavior change).
+- `src/components/TasksForTodayContext.ts` — add `setTaskImportant` to context type.
+- `src/components/TasksForTodayProvider.tsx` — implement `setTaskImportant`.
+- `src/components/TasksForToday.tsx` — wrap rows in `ContextMenu` with the Mark / Remove important item.
+
+No database schema changes.
