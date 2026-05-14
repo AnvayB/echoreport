@@ -248,6 +248,42 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Task tips"
+                className="text-muted-foreground/70 hover:text-foreground transition-colors"
+              >
+                <Info className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 text-sm space-y-3">
+              <p className="font-semibold text-foreground">Tips for managing tasks</p>
+              <ul className="space-y-2 text-muted-foreground">
+                <li>
+                  <span className="font-medium text-foreground">Schedule tasks inline</span> — write phrases like
+                  <span className="text-foreground"> "due tomorrow"</span>,
+                  <span className="text-foreground"> "this week"</span>, or on Fridays
+                  <span className="text-foreground"> "on Monday"</span> /
+                  <span className="text-foreground"> "next week"</span> and they'll land in the right bucket.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Mark as IMPORTANT</span> — add the word
+                  <span className="text-foreground"> IMPORTANT</span> to a task and it'll appear
+                  <span className="font-bold text-foreground"> bolded</span> in your list.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">People recognition</span> — names you mention get a
+                  <span className="inline-flex items-center rounded-full border border-primary/60 bg-primary/5 px-1.5 py-0 text-[0.82em] font-medium text-primary mx-1 align-baseline">pill</span>
+                  border so it's easy to spot who's involved.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Voice input</span> — tap the mic and brain‑dump your tasks naturally; they'll be parsed and grouped for you.
+                </li>
+              </ul>
+            </PopoverContent>
+          </Popover>
         </CardTitle>
       </CardHeader>
       <CardContent>
