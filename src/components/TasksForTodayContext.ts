@@ -6,6 +6,7 @@ export interface TaskRow {
   completed: boolean;
   section: string;
   task_date: string;
+  created_at?: string;
 }
 
 export interface TaskGroup {
