@@ -137,3 +137,13 @@ export const mergeDuplicateTaskRows = <T extends { id?: string; task_text: strin
 export const dedupeTaskRows = <T extends { task_text: string; section: string }>(rows: T[]) => {
   return mergeDuplicateTaskRows(rows).rows;
 };
+export const IMPORTANT_PREFIX_REGEX = /^\s*(?:!!\s*|important[:\s-]+)/i;
+
+export const isTaskImportant = (text: string) => IMPORTANT_PREFIX_REGEX.test(text);
+
+export const stripImportantPrefix = (text: string) => text.replace(IMPORTANT_PREFIX_REGEX, "");
+
+export const setTaskImportantText = (text: string, important: boolean) => {
+  const stripped = stripImportantPrefix(text).trimStart();
+  return important ? `!! ${stripped}` : stripped;
+};
