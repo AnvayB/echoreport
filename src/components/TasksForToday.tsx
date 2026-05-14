@@ -30,6 +30,17 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
 
+  const formatAge = (createdAt?: string) => {
+    if (!createdAt) return null;
+    const created = new Date(createdAt).getTime();
+    if (Number.isNaN(created)) return null;
+    const days = Math.floor((Date.now() - created) / 86400000);
+    if (days < 1) return "today";
+    if (days < 7) return `${days}d`;
+    if (days < 30) return `${Math.floor(days / 7)}w`;
+    return `${Math.floor(days / 30)}mo`;
+  };
+
   const renderCheckboxRow = (row: TaskRow) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
@@ -69,6 +80,27 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             <Check className="h-3 w-3" /> Saved
           </span>
         )}
+        {(() => {
+          const age = formatAge(row.created_at);
+          if (!age) return null;
+          const days = row.created_at
+            ? Math.floor((Date.now() - new Date(row.created_at).getTime()) / 86400000)
+            : 0;
+          const tone =
+            days >= 7
+              ? "bg-destructive/10 text-destructive border-destructive/30"
+              : days >= 3
+              ? "bg-muted text-foreground border-border"
+              : "bg-muted/50 text-muted-foreground border-border";
+          return (
+            <span
+              title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
+              className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-0 text-[10px] leading-4 font-medium tabular-nums ${tone}`}
+            >
+              {age}
+            </span>
+          );
+        })()}
         <button
           type="button"
           onClick={(e) => {
