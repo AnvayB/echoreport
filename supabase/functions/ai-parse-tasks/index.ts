@@ -42,6 +42,7 @@ You MUST respond by calling the parse_tasks tool. Rules:
   - A specific "YYYY-MM-DD" if the user names a weekday or date you can resolve (use today's date above as anchor; pick the next occurrence of that weekday).
   - null if you genuinely cannot tell — caller will default to today.
 - Do NOT invent dates beyond what the text says. When in doubt, prefer "today" over guessing.
+- IMPORTANCE MARKER: If the user marks a task with the word "IMPORTANT" (any case), prefix that task's "text" with "!! " (two exclamation marks and a space) and remove the literal word "IMPORTANT" from the text. Do not add this prefix unless the user explicitly marked it important.
 - If no actionable tasks are found, return { "items": [] }.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
