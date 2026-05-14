@@ -418,8 +418,14 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       list.map((r) => (r.id === row.id ? { ...r, task_text: newText } : r));
     const prevPending = pending;
     const prevBlockers = blockers;
+    const prevGroups = pendingGroups;
     setPending(updater);
     setBlockers(updater);
+    setPendingGroups((groups) =>
+      groups
+        ? groups.map((g) => ({ ...g, rows: updater(g.rows) }))
+        : groups
+    );
 
     const { error } = await supabase
       .from("daily_tasks")
@@ -429,6 +435,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       toast.error("Couldn't update task");
       setPending(prevPending);
       setBlockers(prevBlockers);
+      setPendingGroups(prevGroups);
       return;
     }
     toast.success(important ? "Marked as important" : "Importance removed");
