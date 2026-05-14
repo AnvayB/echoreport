@@ -81,7 +81,7 @@ const TaskText = ({ text, muted = false }: TaskTextProps) => {
           </span>
         );
       })}
-    </>
+    </span>
   );
 };
 
