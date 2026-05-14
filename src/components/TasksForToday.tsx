@@ -273,7 +273,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80 text-sm space-y-3">
               <p className="font-semibold text-foreground">Tips for managing tasks</p>
-              <ul className="space-y-2 text-muted-foreground">
+              <ul className="list-disc pl-5 space-y-2 text-muted-foreground marker:text-muted-foreground/60">
                 <li>
                   <span className="font-medium text-foreground">Schedule tasks inline</span> — write phrases like
                   <span className="text-foreground"> "due tomorrow"</span>,
