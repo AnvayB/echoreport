@@ -435,6 +435,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       toast.error("Couldn't update task");
       setPending(prevPending);
       setBlockers(prevBlockers);
+      setPendingGroups(prevGroups);
       return;
     }
     toast.success(important ? "Marked as important" : "Importance removed");
