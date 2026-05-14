@@ -12,7 +12,11 @@ interface TaskTextProps {
 }
 
 const TaskText = ({ text, muted = false }: TaskTextProps) => {
-  const tokens = useMemo(() => tokenizeWithNames(text), [text]);
+  // Detect importance marker: leading "!!" or a standalone "IMPORTANT" word the AI didn't strip.
+  const importantMatch = /^\s*(?:!!\s*|important[:\s-]+)/i.exec(text);
+  const isImportant = !!importantMatch;
+  const displayText = isImportant ? text.slice(importantMatch![0].length) : text;
+  const tokens = useMemo(() => tokenizeWithNames(displayText), [displayText]);
 
   // Subscribe to cache updates so pills refresh when AI verdicts arrive.
   const [, setTick] = useState(0);
