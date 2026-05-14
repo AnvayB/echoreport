@@ -30,6 +30,17 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
 
+  const formatAge = (createdAt?: string) => {
+    if (!createdAt) return null;
+    const created = new Date(createdAt).getTime();
+    if (Number.isNaN(created)) return null;
+    const days = Math.floor((Date.now() - created) / 86400000);
+    if (days < 1) return "today";
+    if (days < 7) return `${days}d`;
+    if (days < 30) return `${Math.floor(days / 7)}w`;
+    return `${Math.floor(days / 30)}mo`;
+  };
+
   const renderCheckboxRow = (row: TaskRow) => {
     const isSaving = savingId === row.id;
     const isSaved = savedId === row.id;
