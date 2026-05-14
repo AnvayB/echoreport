@@ -122,6 +122,13 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           <X className="h-3.5 w-3.5" />
         </button>
       </label>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem onSelect={() => setTaskImportant(row, !important)}>
+            {important ? "Remove important" : "Mark as important"}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   };
 
