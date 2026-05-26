@@ -1,55 +1,42 @@
 ## Goal
+Make the age pill next to each task escalate in color/intensity across more time ranges, so older tasks visually stand out more.
 
-Add a right-click (context) menu to each task row in the task list, starting with the ability to toggle a task's IMPORTANT status. The menu is built so more actions can be slotted in later without restructuring.
+## Current behavior (in `TasksForToday.tsx`)
+- `< 3 days` → subtle muted pill
+- `3–6 days` → slightly stronger muted pill
+- `≥ 7 days` → destructive (red) pill, same look for 1w, 3w, 1mo+
 
-## Scope
+So everything from 1 week onward looks identical.
 
-- Applies to pending task rows (Today / Tomorrow / This Week buckets) and Blockers.
-- Out of scope for now: completed-task rows. Easy to extend later.
+## New tiering
+Keep `today` and `<3d` as-is. Escalate from 1 week onward:
 
-## Behavior
+| Age | Tone | Intent |
+|---|---|---|
+| today / 1d–2d | muted/50 + muted-foreground | quiet |
+| 3d–6d | muted + foreground | noticeable |
+| 1w (7–13d) | amber/yellow tint + border | warning |
+| 2w–3w (14–27d) | orange tint + border | strong warning |
+| 1mo+ (≥28d) | destructive (red) bg+border | critical |
 
-Right-clicking (or long-pressing on touch) a task opens a small menu next to the cursor with:
+## Implementation
+In the `tone` ternary inside `renderCheckboxRow` (around line 99 of `TasksForToday.tsx`), replace the 3-branch logic with a 5-branch ladder based on `days`:
 
-1. **Mark as important** — when the task is not yet important.
-2. **Remove important** — when the task is already important.
+```ts
+const tone =
+  days >= 28 ? "bg-destructive/10 text-destructive border-destructive/30"
+  : days >= 14 ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
+  : days >= 7  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+  : days >= 3  ? "bg-muted text-foreground border-border"
+  : "bg-muted/50 text-muted-foreground border-border";
+```
 
-Selecting the action immediately:
-- Updates the task text in the database (prepends or strips the `!! ` marker that `TaskText` already renders as bold).
-- Optimistically updates local state so the row re-bolds/un-bolds without a refetch.
+Note on tokens: the project's design system doesn't define semantic "warning" tokens (only `destructive`, `muted`, etc.). Two options:
+- **A (quick):** use Tailwind's built-in `amber-*` / `orange-*` palette inline as above. Pragmatic, no design-system changes.
+- **B (clean):** add `--warning` and `--warning-strong` HSL tokens to `index.css` + `tailwind.config.ts`, then use `bg-warning/10 text-warning border-warning/30`. More work but stays inside the design system.
 
-Failure path: on DB error, revert the optimistic change and show a toast.
-
-The existing left-click checkbox toggle, drag-to-move, and X-to-delete behaviors remain unchanged.
-
-## Future-ready menu items (stubs only — not built yet)
-
-The menu component will be structured so we can later add items like:
-- Move to Today / Tomorrow / This Week
-- Duplicate task
-- Copy task text
-- Convert to / from Blocker
-
-These are placeholders for the "maybe other features" you mentioned — none are implemented in this round.
-
-## Technical notes
-
-- Use the existing shadcn `ContextMenu` primitive (`src/components/ui/context-menu.tsx` is already in the project).
-- Wrap each task row in `TasksForToday.tsx` `renderCheckboxRow` with `<ContextMenu>` / `<ContextMenuTrigger asChild>` so the existing `<label>` keeps its drag/click behavior.
-- Add a `setTaskImportant(row, important: boolean)` method to `TasksForTodayProvider` that:
-  - Computes the new `task_text` (`!! ` prefix add/strip, idempotent — also strips a leading literal `IMPORTANT` token if present).
-  - Updates `pending` and `blockers` state arrays optimistically.
-  - Calls `supabase.from("daily_tasks").update({ task_text }).eq("id", row.id)`.
-  - Reverts state and toasts on error.
-- Expose it through `TasksForTodayContext` and consume in `TasksForToday.tsx`.
-- Detection of "is important" reuses the same regex `TaskText` uses (`/^\s*(?:!!\s*|important[:\s-]+)/i`) — extracted into a tiny helper in `src/lib/taskUtils.ts` so both renderer and provider stay in sync.
+Recommend **A** for a small visual tweak; switch to **B** if you'd like a reusable warning token across the app.
 
 ## Files touched
-
-- `src/lib/taskUtils.ts` — add `isTaskImportant` + `toggleImportantInText` helpers.
-- `src/components/TaskText.tsx` — use the shared helper (no behavior change).
-- `src/components/TasksForTodayContext.ts` — add `setTaskImportant` to context type.
-- `src/components/TasksForTodayProvider.tsx` — implement `setTaskImportant`.
-- `src/components/TasksForToday.tsx` — wrap rows in `ContextMenu` with the Mark / Remove important item.
-
-No database schema changes.
+- `src/components/TasksForToday.tsx` (only the `tone` expression)
+- (option B only) `src/index.css`, `tailwind.config.ts`

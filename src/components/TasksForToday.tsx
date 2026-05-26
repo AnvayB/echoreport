@@ -94,8 +94,12 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             ? Math.floor((Date.now() - new Date(row.created_at).getTime()) / 86400000)
             : 0;
           const tone =
-            days >= 7
-              ? "bg-destructive/10 text-destructive border-destructive/30"
+            days >= 28
+              ? "bg-destructive/15 text-destructive border-destructive/40"
+              : days >= 14
+              ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
+              : days >= 7
+              ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
               : days >= 3
               ? "bg-muted text-foreground border-border"
               : "bg-muted/50 text-muted-foreground border-border";
