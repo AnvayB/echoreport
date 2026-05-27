@@ -35,11 +35,19 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
 
-  const formatAge = (createdAt?: string) => {
+  const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
-    const created = new Date(createdAt).getTime();
-    if (Number.isNaN(created)) return null;
-    const days = Math.floor((Date.now() - created) / 86400000);
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return null;
+    const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.floor((today.getTime() - createdDay.getTime()) / 86400000);
+  };
+
+  const formatAge = (createdAt?: string) => {
+    const days = daysSince(createdAt);
+    if (days === null) return null;
     if (days < 1) return "today";
     if (days < 7) return `${days}d`;
     if (days < 30) return `${Math.floor(days / 7)}w`;
