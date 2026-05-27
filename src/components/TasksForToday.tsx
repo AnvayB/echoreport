@@ -35,11 +35,19 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
 
-  const formatAge = (createdAt?: string) => {
+  const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
-    const created = new Date(createdAt).getTime();
-    if (Number.isNaN(created)) return null;
-    const days = Math.floor((Date.now() - created) / 86400000);
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return null;
+    const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.floor((today.getTime() - createdDay.getTime()) / 86400000);
+  };
+
+  const formatAge = (createdAt?: string) => {
+    const days = daysSince(createdAt);
+    if (days === null) return null;
     if (days < 1) return "today";
     if (days < 7) return `${days}d`;
     if (days < 30) return `${Math.floor(days / 7)}w`;
@@ -90,9 +98,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         {(() => {
           const age = formatAge(row.created_at);
           if (!age) return null;
-          const days = row.created_at
-            ? Math.floor((Date.now() - new Date(row.created_at).getTime()) / 86400000)
-            : 0;
+          const days = daysSince(row.created_at) ?? 0;
           const tone =
             days >= 28
               ? "bg-destructive/15 text-destructive border-destructive/40"
@@ -100,8 +106,6 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
               : days >= 7
               ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-              : days >= 3
-              ? "bg-muted text-foreground border-border"
               : "bg-muted/50 text-muted-foreground border-border";
           return (
             <span
