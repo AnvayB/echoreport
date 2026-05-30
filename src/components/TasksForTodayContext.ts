@@ -20,10 +20,11 @@ export interface DuplicateCluster {
   rows: TaskRow[];
 }
 
-export type Bucket = "today" | "tomorrow" | "thisWeek";
+export type Bucket = "today" | "backlog" | "tomorrow" | "thisWeek";
 
 export interface PendingByBucket {
   today: TaskGroup[] | null;
+  backlog: TaskGroup[] | null;
   tomorrow: TaskGroup[] | null;
   thisWeek: TaskGroup[] | null;
 }
