@@ -383,7 +383,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 ))}
               </div>
             )}
-            {(["today", "tomorrow", "thisWeek"] as Bucket[]).map((b) =>
+            {(["today", "backlog", "tomorrow", "thisWeek"] as Bucket[]).map((b) =>
               renderBucket(b, pendingByBucket[b])
             )}
             {blockers.length > 0 && (
