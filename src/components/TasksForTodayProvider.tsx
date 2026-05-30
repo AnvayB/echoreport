@@ -339,6 +339,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (!user) return;
     const targetDate =
       bucket === "today" ? todayKey
+        : bucket === "backlog" ? formatDateKey(addDays(today, -1))
         : bucket === "tomorrow" ? tomorrowKey
         : weekEndKey; // place "this week" tasks at end of workweek
     const currentBucket = bucketOf(row.task_date);
