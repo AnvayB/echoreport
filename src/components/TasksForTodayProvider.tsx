@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens } from "@/lib/taskUtils";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -22,6 +22,36 @@ interface ProviderProps {
   selectedDate?: Date;
   children: ReactNode;
 }
+
+const LOCAL_GROUP_RULES = [
+  { title: "Databricks", keywords: ["databrick", "query", "table", "generative"] },
+  { title: "Project Hub", keywords: ["project", "hub", "interface"] },
+  { title: "Jira", keywords: ["jira", "notification", "trigger", "comment", "creator", "reporter"] },
+  { title: "CSP", keywords: ["csp", "onenote", "recording"] },
+  { title: "Support Tickets", keywords: ["support", "ticket", "submission"] },
+  { title: "Analytics", keywords: ["analytics", "usage", "license", "survey", "region", "load", "statistics", "graph"] },
+  { title: "ACL", keywords: ["acl", "fae", "manager", "reminder"] },
+  { title: "Code Organization", keywords: ["tsx", "folder", "code", "page", "specific"] },
+] as const;
+
+const buildLocalTaskGroups = (rows: TaskRow[]): TaskGroup[] => {
+  const groups = new Map<string, TaskRow[]>();
+
+  rows.forEach((row) => {
+    const tokens = new Set(getTaskComparisonTokens(row.task_text));
+    const match = LOCAL_GROUP_RULES
+      .map((rule) => ({
+        title: rule.title,
+        score: rule.keywords.filter((keyword) => tokens.has(keyword)).length,
+      }))
+      .filter((rule) => rule.score > 0)
+      .sort((a, b) => b.score - a.score)[0];
+    const title = match?.title ?? "Other Tasks";
+    groups.set(title, [...(groups.get(title) ?? []), row]);
+  });
+
+  return [...groups.entries()].map(([title, groupedRows]) => ({ title, rows: groupedRows }));
+};
 
 export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps) => {
   const { user } = useAuth();
