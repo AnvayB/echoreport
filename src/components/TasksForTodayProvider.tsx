@@ -172,7 +172,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         const rawGroups: Array<{ title: string; task_ids: string[] }> = Array.isArray(data?.groups) ? data.groups : [];
         const unavailable = data?.unavailable === true || rawGroups.length === 0;
 
-        // If AI is unavailable, keep prior group titles and slot any new tasks into "Other".
+        // If AI is unavailable, keep prior group titles and locally group any new tasks by topic.
         if (unavailable) {
           setPendingGroups((prev) => {
             const byId = new Map(pending.map((r) => [r.id, r]));
@@ -186,8 +186,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
               if (rows.length > 0) groups.push({ title: g.title, rows });
             });
             const leftover = pending.filter((r) => !used.has(r.id));
-            if (leftover.length > 0) groups.push({ title: groups.length > 0 ? "Other" : "General", rows: leftover });
-            return groups;
+            if (leftover.length > 0) groups.push(...buildLocalTaskGroups(leftover));
+            return groups.length > 0 ? groups : buildLocalTaskGroups(pending);
           });
           return;
         }
@@ -207,9 +207,9 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         setPendingGroups(groups.length > 0 ? groups : [{ title: "General", rows: pending }]);
       } catch (e) {
         console.error("Failed to group tasks:", e);
-        // Preserve any existing groupings; only fall back if we have none yet.
+        // Preserve any existing groupings; locally group if we have none yet.
         if (!cancelled) {
-          setPendingGroups((prev) => prev && prev.length > 0 ? prev : [{ title: "General", rows: pending }]);
+          setPendingGroups((prev) => prev && prev.length > 0 ? prev : buildLocalTaskGroups(pending));
         }
       } finally {
         if (!cancelled) setGrouping(false);
