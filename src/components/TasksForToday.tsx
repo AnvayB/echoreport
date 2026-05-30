@@ -34,6 +34,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
+  const [backlogOpen, setBacklogOpen] = useState(false);
 
   const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
