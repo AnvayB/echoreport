@@ -200,7 +200,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           <p className="text-xs text-muted-foreground italic py-1">
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
-        ) : (
+        ) : bucket === "backlog" ? (
           <div className="space-y-3">
             {groups!.map((g, gi) => (
               <div key={gi} className="pl-1">
@@ -210,6 +210,10 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 <div className="space-y-1.5">{g.rows.map(renderCheckboxRow)}</div>
               </div>
             ))}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {groups!.flatMap((g) => g.rows).map(renderCheckboxRow)}
           </div>
         )}
       </div>
