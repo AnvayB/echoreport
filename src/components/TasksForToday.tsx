@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -34,6 +34,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
+  const [backlogOpen, setBacklogOpen] = useState(false);
 
   const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
@@ -171,13 +172,31 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             : "border-foreground bg-muted/50"
         }`}
       >
-        <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
-          {bucketLabels[bucket]}
-          {bucket === "today" && grouping && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          )}
-        </p>
-        {!hasItems ? (
+        {bucket === "backlog" ? (
+          <button
+            type="button"
+            onClick={() => setBacklogOpen((o) => !o)}
+            className="w-full font-semibold text-sm text-foreground mb-2 flex items-center gap-2 hover:text-foreground/80 transition-colors"
+          >
+            <ChevronRight
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${backlogOpen ? "rotate-90" : ""}`}
+            />
+            {bucketLabels[bucket]}
+            {hasItems && (
+              <span className="text-xs font-normal text-muted-foreground">
+                ({groups!.reduce((n, g) => n + g.rows.length, 0)})
+              </span>
+            )}
+          </button>
+        ) : (
+          <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
+            {bucketLabels[bucket]}
+            {bucket === "today" && grouping && (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            )}
+          </p>
+        )}
+        {bucket === "backlog" && !backlogOpen ? null : !hasItems ? (
           <p className="text-xs text-muted-foreground italic py-1">
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
@@ -364,7 +383,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 ))}
               </div>
             )}
-            {(["today", "tomorrow", "thisWeek"] as Bucket[]).map((b) =>
+            {(["today", "backlog", "tomorrow", "thisWeek"] as Bucket[]).map((b) =>
               renderBucket(b, pendingByBucket[b])
             )}
             {blockers.length > 0 && (

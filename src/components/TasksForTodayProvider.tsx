@@ -37,6 +37,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     : getWeekEndKey(today);
   const bucketLabels: Record<Bucket, string> = {
     today: "Today",
+    backlog: "Backlog",
     tomorrow: isEndOfWeek ? "Monday" : "Tomorrow",
     thisWeek: isEndOfWeek ? "Next Week" : "This Week",
   };
@@ -238,20 +239,20 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
 
   // Slice pending tasks (and their topic groups) into time buckets by task_date.
   const bucketOf = (dateKey: string): Bucket => {
-    if (dateKey <= todayKey) return "today"; // includes overdue
+    if (dateKey < todayKey) return "backlog";
+    if (dateKey === todayKey) return "today";
     if (dateKey === tomorrowKey) return "tomorrow";
     return "thisWeek";
   };
 
   const pendingByBucket: PendingByBucket = useMemo(() => {
-    const empty = { today: [] as TaskGroup[], tomorrow: [] as TaskGroup[], thisWeek: [] as TaskGroup[] };
+    const empty = { today: [] as TaskGroup[], backlog: [] as TaskGroup[], tomorrow: [] as TaskGroup[], thisWeek: [] as TaskGroup[] };
     if (pending.length === 0) {
-      return { today: null, tomorrow: null, thisWeek: null };
+      return { today: null, backlog: null, tomorrow: null, thisWeek: null };
     }
-    // Use AI-derived groups if available; otherwise fall back to a single "General" group.
     const groups: TaskGroup[] = pendingGroups ?? [{ title: "General", rows: pending }];
     groups.forEach((g) => {
-      const splits: Record<Bucket, TaskRow[]> = { today: [], tomorrow: [], thisWeek: [] };
+      const splits: Record<Bucket, TaskRow[]> = { today: [], backlog: [], tomorrow: [], thisWeek: [] };
       g.rows.forEach((r) => splits[bucketOf(r.task_date)].push(r));
       (Object.keys(splits) as Bucket[]).forEach((b) => {
         if (splits[b].length > 0) empty[b].push({ title: g.title, rows: splits[b] });
@@ -259,6 +260,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     });
     return {
       today: empty.today,
+      backlog: empty.backlog,
       tomorrow: empty.tomorrow,
       thisWeek: empty.thisWeek,
     };
@@ -337,6 +339,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (!user) return;
     const targetDate =
       bucket === "today" ? todayKey
+        : bucket === "backlog" ? formatDateKey(addDays(today, -1))
         : bucket === "tomorrow" ? tomorrowKey
         : weekEndKey; // place "this week" tasks at end of workweek
     const currentBucket = bucketOf(row.task_date);
