@@ -172,13 +172,31 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             : "border-foreground bg-muted/50"
         }`}
       >
-        <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
-          {bucketLabels[bucket]}
-          {bucket === "today" && grouping && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          )}
-        </p>
-        {!hasItems ? (
+        {bucket === "backlog" ? (
+          <button
+            type="button"
+            onClick={() => setBacklogOpen((o) => !o)}
+            className="w-full font-semibold text-sm text-foreground mb-2 flex items-center gap-2 hover:text-foreground/80 transition-colors"
+          >
+            <ChevronRight
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${backlogOpen ? "rotate-90" : ""}`}
+            />
+            {bucketLabels[bucket]}
+            {hasItems && (
+              <span className="text-xs font-normal text-muted-foreground">
+                ({groups!.reduce((n, g) => n + g.rows.length, 0)})
+              </span>
+            )}
+          </button>
+        ) : (
+          <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
+            {bucketLabels[bucket]}
+            {bucket === "today" && grouping && (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            )}
+          </p>
+        )}
+        {bucket === "backlog" && !backlogOpen ? null : !hasItems ? (
           <p className="text-xs text-muted-foreground italic py-1">
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
