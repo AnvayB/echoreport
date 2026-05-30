@@ -140,6 +140,28 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         if (cancelled) return;
         if (error) throw error;
         const rawGroups: Array<{ title: string; task_ids: string[] }> = Array.isArray(data?.groups) ? data.groups : [];
+        const unavailable = data?.unavailable === true || rawGroups.length === 0;
+
+        // If AI is unavailable, keep prior group titles and slot any new tasks into "Other".
+        if (unavailable) {
+          setPendingGroups((prev) => {
+            const byId = new Map(pending.map((r) => [r.id, r]));
+            const used = new Set<string>();
+            const groups: TaskGroup[] = [];
+            (prev ?? []).forEach((g) => {
+              const rows = g.rows
+                .map((r) => byId.get(r.id))
+                .filter((r): r is TaskRow => Boolean(r) && !used.has(r!.id));
+              rows.forEach((r) => used.add(r.id));
+              if (rows.length > 0) groups.push({ title: g.title, rows });
+            });
+            const leftover = pending.filter((r) => !used.has(r.id));
+            if (leftover.length > 0) groups.push({ title: groups.length > 0 ? "Other" : "General", rows: leftover });
+            return groups;
+          });
+          return;
+        }
+
         const byId = new Map(pending.map((r) => [r.id, r]));
         const used = new Set<string>();
         const groups: TaskGroup[] = [];
@@ -155,7 +177,10 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         setPendingGroups(groups.length > 0 ? groups : [{ title: "General", rows: pending }]);
       } catch (e) {
         console.error("Failed to group tasks:", e);
-        if (!cancelled) setPendingGroups([{ title: "General", rows: pending }]);
+        // Preserve any existing groupings; only fall back if we have none yet.
+        if (!cancelled) {
+          setPendingGroups((prev) => prev && prev.length > 0 ? prev : [{ title: "General", rows: pending }]);
+        }
       } finally {
         if (!cancelled) setGrouping(false);
       }
