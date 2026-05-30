@@ -436,7 +436,10 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       });
       if (error) throw error;
       const rawItems: Array<{ text: string; when: string | null }> = Array.isArray(data?.items)
-        ? data.items.filter((i: any) => i && typeof i.text === "string")
+        ? data.items.filter((i: unknown): i is { text: string; when?: string | null } => {
+            if (!i || typeof i !== "object") return false;
+            return typeof (i as { text?: unknown }).text === "string";
+          })
         : [];
       // Dedupe by text while preserving the first when-hint we see.
       const seen: Array<{ text: string; when: string | null }> = [];
