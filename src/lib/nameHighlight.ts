@@ -55,6 +55,9 @@ const isCapWord = (w: string) => CAP_WORD.test(w);
 
 const stripPunct = (w: string) => w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
 
+// Strip possessive suffix ('s or 's) so "Gilles's" → "Gilles" for verification/display.
+const stripPossessive = (w: string) => w.replace(/['’]s$/u, "");
+
 const looksLikeName = (rawWord: string): boolean => {
   const w = stripPunct(rawWord);
   if (!w || !isCapWord(w)) return false;
@@ -114,10 +117,12 @@ export function tokenizeWithNames(text: string): NameToken[] {
       // We accept by default; comm-verb just gives extra confidence (no rejection here).
 
       // Greedy: try to extend with next capitalized word as last name.
-      let nameText = wordCore;
+      const nameCore = stripPossessive(wordCore);
+      const possessiveSuffix = wordCore.slice(nameCore.length);
+      let nameText = nameCore;
       // Preserve leading/trailing punctuation that was attached to this token.
       const leading = part.slice(0, part.indexOf(wordCore));
-      let trailing = part.slice(part.indexOf(wordCore) + wordCore.length);
+      let trailing = possessiveSuffix + part.slice(part.indexOf(wordCore) + wordCore.length);
 
       // Look ahead past whitespace for a possible last name.
       let j = i + 1;
