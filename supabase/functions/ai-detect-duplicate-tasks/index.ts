@@ -28,19 +28,26 @@ serve(async (req) => {
       .map((t: { id: string; task_text: string }) => `[id=${t.id}] ${t.task_text}`)
       .join("\n");
 
-    const systemPrompt = `You find duplicate or near-duplicate tasks in a user's todo list.
+    const systemPrompt = `You find DUPLICATE tasks in a user's todo list. Be VERY CONSERVATIVE — when in doubt, do NOT cluster.
 
-Two tasks should be clustered together ONLY if they describe the same intended piece of work, even if worded differently. Examples of duplicates:
-- "Enhance Project Hub user interface" and "improve Project Hub UI"
-- "Add Customer Projects to CSP main page" and "Display Customer Projects on CSP homepage"
+Two tasks are duplicates ONLY if they describe the SAME concrete piece of work: same action verb (or clear synonym) AND same specific object/deliverable. Different wording is fine, but the underlying work must be interchangeable — completing one would satisfy the other.
 
-DO NOT cluster tasks that are merely related, share a project name, or involve the same person. Different actions on the same project are NOT duplicates.
+DUPLICATES (cluster these):
+- "Enhance Project Hub user interface" / "Improve Project Hub UI"
+- "Add Customer Projects to CSP main page" / "Display Customer Projects on CSP homepage"
+- "Email Sarah about Q3 budget" / "Send Sarah the Q3 budget email"
+
+NOT DUPLICATES (do NOT cluster):
+- "Enhance Project Hub user interface" / "Develop product analytics view"  ← different deliverables
+- "Enhance Project Hub UI" / "Fix bug in Project Hub login"  ← same project, different work
+- "Review PR #123" / "Review PR #456"  ← same action, different targets
+- Two tasks that just share a project name, person, or tool
 
 You MUST respond by calling the report_duplicates tool. Rules:
 - Only return clusters of 2 or more task ids.
 - Each id must come from the input. Do not invent ids.
 - An id may appear in at most one cluster.
-- If there are no duplicates, return an empty clusters array.
+- If unsure, return an empty clusters array. False positives are worse than misses.
 - Provide a short reason (under 10 words) for each cluster.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
