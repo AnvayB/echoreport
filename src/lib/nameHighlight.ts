@@ -117,10 +117,12 @@ export function tokenizeWithNames(text: string): NameToken[] {
       // We accept by default; comm-verb just gives extra confidence (no rejection here).
 
       // Greedy: try to extend with next capitalized word as last name.
-      let nameText = wordCore;
+      const nameCore = stripPossessive(wordCore);
+      const possessiveSuffix = wordCore.slice(nameCore.length);
+      let nameText = nameCore;
       // Preserve leading/trailing punctuation that was attached to this token.
       const leading = part.slice(0, part.indexOf(wordCore));
-      let trailing = part.slice(part.indexOf(wordCore) + wordCore.length);
+      let trailing = possessiveSuffix + part.slice(part.indexOf(wordCore) + wordCore.length);
 
       // Look ahead past whitespace for a possible last name.
       let j = i + 1;
