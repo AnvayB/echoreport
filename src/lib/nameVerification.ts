@@ -62,6 +62,42 @@ function normalize(t: string): string {
   return t.trim();
 }
 
+/** Manually override a verdict (e.g. via right-click). Persists to server. */
+export async function setVerdict(token: string, isName: boolean): Promise<void> {
+  const t = normalize(token);
+  if (!t) return;
+  const c = loadCache();
+  c[t] = isName ? "name" : "not_name";
+  if (!isName && t.includes(" ")) {
+    for (const part of t.split(/\s+/)) {
+      const p = normalize(part);
+      if (p) c[p] = "not_name";
+    }
+  }
+  persist();
+  notify();
+
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+    const rows: { user_id: string; token: string; is_name: boolean }[] = [
+      { user_id: userId, token: t, is_name: isName },
+    ];
+    if (!isName && t.includes(" ")) {
+      for (const part of t.split(/\s+/)) {
+        const p = normalize(part);
+        if (p) rows.push({ user_id: userId, token: p, is_name: false });
+      }
+    }
+    await supabase
+      .from("known_names")
+      .upsert(rows, { onConflict: "user_id,token" });
+  } catch (e) {
+    console.warn("setVerdict persist failed", e);
+  }
+}
+
 /** Submit candidate tokens for AI classification. Debounced/batched. */
 let queue: Set<string> = new Set();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
