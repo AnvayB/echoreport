@@ -57,7 +57,8 @@ You MUST respond by calling the report_duplicates tool. Rules:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
+        temperature: 0,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Find duplicates in these tasks:\n\n${taskList}` },
