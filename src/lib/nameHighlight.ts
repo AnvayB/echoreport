@@ -55,6 +55,9 @@ const isCapWord = (w: string) => CAP_WORD.test(w);
 
 const stripPunct = (w: string) => w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
 
+// Strip possessive suffix ('s or 's) so "Gilles's" → "Gilles" for verification/display.
+const stripPossessive = (w: string) => w.replace(/['’]s$/u, "");
+
 const looksLikeName = (rawWord: string): boolean => {
   const w = stripPunct(rawWord);
   if (!w || !isCapWord(w)) return false;
