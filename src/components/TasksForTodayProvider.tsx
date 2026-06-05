@@ -289,16 +289,41 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   }, [detectKey]);
 
   const visibleDuplicateClusters = useMemo(
-    () => duplicateClusters.filter((c) => !dismissedDuplicateKeys.has(c.key)),
-    [duplicateClusters, dismissedDuplicateKeys]
+    () =>
+      duplicateClusters.filter((c) => {
+        if (dismissedDuplicateKeys.has(c.key)) return false;
+        const texts = c.rows.map((r) => r.task_text);
+        const pairs = clusterPairKeys(texts);
+        // Hide cluster if every pairing in it has been dismissed as "keep both" before.
+        return pairs.length === 0 || !pairs.every((p) => dismissedPairKeys.has(p));
+      }),
+    [duplicateClusters, dismissedDuplicateKeys, dismissedPairKeys]
   );
 
   const dismissDuplicateCluster = (key: string) => {
+    const cluster = duplicateClusters.find((c) => c.key === key);
     setDismissedDuplicateKeys((prev) => {
       const next = new Set(prev);
       next.add(key);
       return next;
     });
+    if (!cluster || !user) return;
+    const pairs = clusterPairKeys(cluster.rows.map((r) => r.task_text));
+    if (pairs.length === 0) return;
+    setDismissedPairKeys((prev) => {
+      const next = new Set(prev);
+      pairs.forEach((p) => next.add(p));
+      return next;
+    });
+    (async () => {
+      const { error } = await supabase
+        .from("dismissed_duplicate_pairs")
+        .upsert(
+          pairs.map((pair_key) => ({ user_id: user.id, pair_key })),
+          { onConflict: "user_id,pair_key", ignoreDuplicates: true }
+        );
+      if (error) console.error("Failed to persist dismissed duplicate pairs:", error);
+    })();
   };
 
   const resolveDuplicateCluster = async (key: string, keepId: string) => {
