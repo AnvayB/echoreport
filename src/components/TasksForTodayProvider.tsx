@@ -2,7 +2,22 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
+
+const pairKey = (a: string, b: string) => {
+  const [x, y] = [normalizeTaskText(a), normalizeTaskText(b)].sort();
+  return `${x}||${y}`;
+};
+
+const clusterPairKeys = (texts: string[]): string[] => {
+  const keys: string[] = [];
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      keys.push(pairKey(texts[i], texts[j]));
+    }
+  }
+  return keys;
+};
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
