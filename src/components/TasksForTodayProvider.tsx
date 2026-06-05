@@ -2,7 +2,22 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
+
+const pairKey = (a: string, b: string) => {
+  const [x, y] = [normalizeTaskText(a), normalizeTaskText(b)].sort();
+  return `${x}||${y}`;
+};
+
+const clusterPairKeys = (texts: string[]): string[] => {
+  const keys: string[] = [];
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      keys.push(pairKey(texts[i], texts[j]));
+    }
+  }
+  return keys;
+};
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -87,6 +102,23 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [adding, setAdding] = useState(false);
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [dismissedDuplicateKeys, setDismissedDuplicateKeys] = useState<Set<string>>(new Set());
+  const [dismissedPairKeys, setDismissedPairKeys] = useState<Set<string>>(new Set());
+
+  // Load persisted "keep both" dismissals.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("dismissed_duplicate_pairs")
+        .select("pair_key")
+        .eq("user_id", user.id);
+      if (error) {
+        console.error("Failed to load dismissed duplicate pairs:", error);
+        return;
+      }
+      setDismissedPairKeys(new Set((data ?? []).map((r) => r.pair_key)));
+    })();
+  }, [user]);
 
   const load = async () => {
     if (!user) return;
@@ -257,16 +289,41 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   }, [detectKey]);
 
   const visibleDuplicateClusters = useMemo(
-    () => duplicateClusters.filter((c) => !dismissedDuplicateKeys.has(c.key)),
-    [duplicateClusters, dismissedDuplicateKeys]
+    () =>
+      duplicateClusters.filter((c) => {
+        if (dismissedDuplicateKeys.has(c.key)) return false;
+        const texts = c.rows.map((r) => r.task_text);
+        const pairs = clusterPairKeys(texts);
+        // Hide cluster if every pairing in it has been dismissed as "keep both" before.
+        return pairs.length === 0 || !pairs.every((p) => dismissedPairKeys.has(p));
+      }),
+    [duplicateClusters, dismissedDuplicateKeys, dismissedPairKeys]
   );
 
   const dismissDuplicateCluster = (key: string) => {
+    const cluster = duplicateClusters.find((c) => c.key === key);
     setDismissedDuplicateKeys((prev) => {
       const next = new Set(prev);
       next.add(key);
       return next;
     });
+    if (!cluster || !user) return;
+    const pairs = clusterPairKeys(cluster.rows.map((r) => r.task_text));
+    if (pairs.length === 0) return;
+    setDismissedPairKeys((prev) => {
+      const next = new Set(prev);
+      pairs.forEach((p) => next.add(p));
+      return next;
+    });
+    (async () => {
+      const { error } = await supabase
+        .from("dismissed_duplicate_pairs")
+        .upsert(
+          pairs.map((pair_key) => ({ user_id: user.id, pair_key })),
+          { onConflict: "user_id,pair_key", ignoreDuplicates: true }
+        );
+      if (error) console.error("Failed to persist dismissed duplicate pairs:", error);
+    })();
   };
 
   const resolveDuplicateCluster = async (key: string, keepId: string) => {
