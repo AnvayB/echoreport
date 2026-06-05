@@ -102,6 +102,23 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [adding, setAdding] = useState(false);
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [dismissedDuplicateKeys, setDismissedDuplicateKeys] = useState<Set<string>>(new Set());
+  const [dismissedPairKeys, setDismissedPairKeys] = useState<Set<string>>(new Set());
+
+  // Load persisted "keep both" dismissals.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("dismissed_duplicate_pairs")
+        .select("pair_key")
+        .eq("user_id", user.id);
+      if (error) {
+        console.error("Failed to load dismissed duplicate pairs:", error);
+        return;
+      }
+      setDismissedPairKeys(new Set((data ?? []).map((r) => r.pair_key)));
+    })();
+  }, [user]);
 
   const load = async () => {
     if (!user) return;
