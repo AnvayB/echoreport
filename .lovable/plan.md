@@ -1,42 +1,32 @@
-## Goal
-Make the age pill next to each task escalate in color/intensity across more time ranges, so older tasks visually stand out more.
 
-## Current behavior (in `TasksForToday.tsx`)
-- `< 3 days` → subtle muted pill
-- `3–6 days` → slightly stronger muted pill
-- `≥ 7 days` → destructive (red) pill, same look for 1w, 3w, 1mo+
+# Better Person Recognition
 
-So everything from 1 week onward looks identical.
+## Diagnosis
 
-## New tiering
-Keep `today` and `<3d` as-is. Escalate from 1 week onward:
+Today's classifier (`ai-classify-names`) sees candidate tokens as a **bare list of strings** — no surrounding sentence, no project context. That's the main reason it misfires: "Arteris", "Hub", "Gilles" all look equally name-like in isolation. Adding an X button patches the symptom; the real fix is giving the model the information a human would use.
 
-| Age | Tone | Intent |
-|---|---|---|
-| today / 1d–2d | muted/50 + muted-foreground | quiet |
-| 3d–6d | muted + foreground | noticeable |
-| 1w (7–13d) | amber/yellow tint + border | warning |
-| 2w–3w (14–27d) | orange tint + border | strong warning |
-| 1mo+ (≥28d) | destructive (red) bg+border | critical |
+A second "checker agent" on top of the same context-free input wouldn't help much — it has the same blind spot. A single, better-informed pass is more accurate **and** cheaper than two weak passes.
 
-## Implementation
-In the `tone` ternary inside `renderCheckboxRow` (around line 99 of `TasksForToday.tsx`), replace the 3-branch logic with a 5-branch ladder based on `days`:
+## Recommended approach (single upgraded pass, no X needed)
 
-```ts
-const tone =
-  days >= 28 ? "bg-destructive/10 text-destructive border-destructive/30"
-  : days >= 14 ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
-  : days >= 7  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-  : days >= 3  ? "bg-muted text-foreground border-border"
-  : "bg-muted/50 text-muted-foreground border-border";
-```
+1. **Send context with each candidate.** When `TaskText` queues unknown tokens, also send the task sentence(s) they appear in. The edge function classifies each `{token, contexts[]}` pair, so the model can see e.g. *"sync with Gilles tomorrow"* vs *"ship Arteris integration"*.
+2. **Upgrade the model** from `gpt-4o-mini` → `gpt-4o` at `temperature: 0`, matching what we already did for duplicate detection.
+3. **Tighten the prompt** with explicit non-person categories observed in this app (project names, tools, repos, tickets, product features) and require the model to justify each verdict internally before answering (chain-of-thought via a hidden `reasoning` field in the tool schema — kept server-side, not returned).
+4. **Conservative-by-default**: only mark as person when confidence is high; everything else → `not_name`. This is what removes the need for the X — false positives become rare enough that manual correction isn't worth surfacing.
+5. **Optional lightweight verifier** for the *positives only* (cheap, small batch): a second `gpt-4o-mini` call that re-reads each confirmed name with its context and can downgrade it. Runs only on the small "yes" set, so cost stays low. Gated behind a flag so we can A/B.
+6. **Remove the X button** from `TaskText.tsx` once accuracy is acceptable. Keep the underlying `setVerdict` API + `known_names` cache so power-users can still correct via a (future) settings page if needed, but the pill UI becomes clean again.
 
-Note on tokens: the project's design system doesn't define semantic "warning" tokens (only `destructive`, `muted`, etc.). Two options:
-- **A (quick):** use Tailwind's built-in `amber-*` / `orange-*` palette inline as above. Pragmatic, no design-system changes.
-- **B (clean):** add `--warning` and `--warning-strong` HSL tokens to `index.css` + `tailwind.config.ts`, then use `bg-warning/10 text-warning border-warning/30`. More work but stays inside the design system.
+## Why not just a second agent
 
-Recommend **A** for a small visual tweak; switch to **B** if you'd like a reusable warning token across the app.
+A verifier on top of context-free input would re-confirm the same wrong guess most of the time. Context is the missing signal — once the first pass has it, a verifier becomes a small refinement, not the main fix.
 
-## Files touched
-- `src/components/TasksForToday.tsx` (only the `tone` expression)
-- (option B only) `src/index.css`, `tailwind.config.ts`
+## Files to change
+
+- `supabase/functions/ai-classify-names/index.ts` — accept `{ candidates: [{token, contexts[]}] }`, upgraded model + prompt, optional verifier pass.
+- `src/lib/nameVerification.ts` — change `verifyCandidates` signature to accept contexts; batch by token but carry contexts through.
+- `src/components/TaskText.tsx` — pass `displayText` as context when queuing tokens; remove the inline X button and its imports.
+
+## Open questions
+
+- Keep the manual override path (just hidden), or rip it out entirely?
+- Run the optional verifier pass from day one, or ship the context-aware single pass first and only add the verifier if accuracy is still off?

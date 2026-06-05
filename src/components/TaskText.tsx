@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
 import { tokenizeWithNames } from "@/lib/nameHighlight";
 import { IMPORTANT_PREFIX_REGEX } from "@/lib/taskUtils";
 import {
   getVerdict,
-  setVerdict,
   subscribeNameVerify,
   verifyCandidates,
 } from "@/lib/nameVerification";
@@ -35,8 +33,8 @@ const TaskText = ({ text, muted = false }: TaskTextProps) => {
         unknown.push(tok.value);
       }
     }
-    if (unknown.length) verifyCandidates(unknown);
-  }, [tokens]);
+    if (unknown.length) verifyCandidates(unknown, displayText);
+  }, [tokens, displayText]);
 
   return (
     <span className={isImportant ? "font-bold" : undefined}>
@@ -62,7 +60,7 @@ const TaskText = ({ text, muted = false }: TaskTextProps) => {
           <span
             key={i}
             className={[
-              "inline-flex items-center gap-0.5 rounded-full border pl-1.5 pr-0.5 py-0",
+              "inline-flex items-center rounded-full border px-1.5 py-0",
               "text-[0.82em] font-medium leading-snug align-baseline mx-0.5",
               muted
                 ? "border-muted-foreground/40 text-muted-foreground bg-transparent"
@@ -71,22 +69,6 @@ const TaskText = ({ text, muted = false }: TaskTextProps) => {
             ].join(" ")}
           >
             {tok.value}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setVerdict(tok.value, false);
-              }}
-              aria-label={`Remove ${tok.value} as person`}
-              className={[
-                "inline-flex h-3.5 w-3.5 items-center justify-center rounded-full",
-                "hover:bg-foreground/10 transition-colors",
-                "focus:outline-none focus-visible:ring-1 focus-visible:ring-current",
-              ].join(" ")}
-            >
-              <X className="h-2.5 w-2.5" strokeWidth={2.5} />
-            </button>
           </span>
         );
       })}

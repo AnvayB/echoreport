@@ -99,19 +99,25 @@ export async function setVerdict(token: string, isName: boolean): Promise<void> 
 }
 
 /** Submit candidate tokens for AI classification. Debounced/batched. */
-let queue: Set<string> = new Set();
+const queue: Map<string, Set<string>> = new Map();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function verifyCandidates(tokens: string[]) {
+export function verifyCandidates(tokens: string[], context?: string) {
   const c = loadCache();
   let added = false;
+  const ctx = context?.trim();
   for (const raw of tokens) {
     const t = normalize(raw);
     if (!t) continue;
     if (c[t] !== undefined) continue;
-    if (inFlight.has(t)) continue;
-    queue.add(t);
-    added = true;
+    let ctxSet = queue.get(t);
+    if (!ctxSet) {
+      if (inFlight.has(t)) continue;
+      ctxSet = new Set();
+      queue.set(t, ctxSet);
+      added = true;
+    }
+    if (ctx && ctxSet.size < 3) ctxSet.add(ctx);
   }
   if (!added) return;
   if (flushTimer) clearTimeout(flushTimer);
@@ -121,13 +127,19 @@ export function verifyCandidates(tokens: string[]) {
 async function flush() {
   flushTimer = null;
   if (queue.size === 0) return;
-  const batch = Array.from(queue);
-  queue = new Set();
+  const entries = Array.from(queue.entries());
+  queue.clear();
+  const batch = entries.map(([token]) => token);
   batch.forEach((t) => inFlight.add(t));
 
   try {
     const { data, error } = await supabase.functions.invoke("ai-classify-names", {
-      body: { candidates: batch },
+      body: {
+        candidates: entries.map(([token, ctxSet]) => ({
+          token,
+          contexts: Array.from(ctxSet),
+        })),
+      },
     });
     if (error) throw error;
     const names: string[] = Array.isArray(data?.names) ? data.names : [];
