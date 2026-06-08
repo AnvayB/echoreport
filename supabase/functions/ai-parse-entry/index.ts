@@ -49,7 +49,8 @@ For each pending task's "when":
 Rules:
 - Use bullet points (lines starting with "- ") within the four text fields.
 - If a category has nothing, return an empty string "" (or empty array for pending_task_schedule).
-- Keep the user's wording as much as possible.
+- For "accomplishments", "blockers", and "notes": keep the user's wording as much as possible.
+- ACTION-ITEM REWRITE for pending tasks: In BOTH "pending_tasks" bullets and "pending_task_schedule" entries, rewrite each item as a concise, imperative action item starting with a verb. Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos (e.g., "too" used where "to" is meant). Preserve all specifics (names, tools, context). Example: "- need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
 - IMPORTANCE MARKER: If a task is marked with the word "IMPORTANT" (any case) by the user, prefix that task's text with "!! " (two exclamation marks and a space) in BOTH "pending_tasks" bullets and "pending_task_schedule" entries, and remove the literal word "IMPORTANT" from the text. Do not add this prefix unless the user explicitly marked the task important.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
