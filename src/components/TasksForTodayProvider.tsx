@@ -124,7 +124,11 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         console.error("Failed to load dismissed duplicate pairs:", error);
         return;
       }
-      setDismissedPairKeys(new Set((data ?? []).map((r) => r.pair_key)));
+      setDismissedPairKeys((prev) => {
+        const next = new Set(prev);
+        (data ?? []).forEach((r) => next.add(r.pair_key));
+        return next;
+      });
     })();
   }, [user]);
 
