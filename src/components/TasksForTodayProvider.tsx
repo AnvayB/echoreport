@@ -3,21 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
-
-const pairKey = (a: string, b: string) => {
-  const [x, y] = [normalizeTaskText(a), normalizeTaskText(b)].sort();
-  return `${x}||${y}`;
-};
-
-const clusterPairKeys = (texts: string[]): string[] => {
-  const keys: string[] = [];
-  for (let i = 0; i < texts.length; i++) {
-    for (let j = i + 1; j < texts.length; j++) {
-      keys.push(pairKey(texts[i], texts[j]));
-    }
-  }
-  return keys;
-};
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -29,6 +14,29 @@ import {
   type PendingByBucket,
   type DuplicateCluster,
 } from "./TasksForTodayContext";
+
+const stablePairKey = (a: string, b: string) => {
+  const toStableKey = (text: string) => getTaskComparisonTokens(text).sort().join(" ") || text.trim().toLowerCase();
+  const [x, y] = [toStableKey(a), toStableKey(b)].sort();
+  return `${x}||${y}`;
+};
+
+const legacyPairKey = (a: string, b: string) => {
+  const [x, y] = [normalizeTaskText(a), normalizeTaskText(b)].sort();
+  return `${x}||${y}`;
+};
+
+const taskPairKeys = (a: string, b: string) => [...new Set([stablePairKey(a, b), legacyPairKey(a, b)])];
+
+const clusterPairKeyGroups = (texts: string[]): string[][] => {
+  const groups: string[][] = [];
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      groups.push(taskPairKeys(texts[i], texts[j]));
+    }
+  }
+  return groups;
+};
 
 export { useTasksForToday } from "./TasksForTodayContext";
 export type { TaskRow, TaskGroup } from "./TasksForTodayContext";
@@ -116,7 +124,11 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         console.error("Failed to load dismissed duplicate pairs:", error);
         return;
       }
-      setDismissedPairKeys(new Set((data ?? []).map((r) => r.pair_key)));
+      setDismissedPairKeys((prev) => {
+        const next = new Set(prev);
+        (data ?? []).forEach((r) => next.add(r.pair_key));
+        return next;
+      });
     })();
   }, [user]);
 
@@ -293,9 +305,9 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       duplicateClusters.filter((c) => {
         if (dismissedDuplicateKeys.has(c.key)) return false;
         const texts = c.rows.map((r) => r.task_text);
-        const pairs = clusterPairKeys(texts);
+        const pairs = clusterPairKeyGroups(texts);
         // Hide cluster if every pairing in it has been dismissed as "keep both" before.
-        return pairs.length === 0 || !pairs.every((p) => dismissedPairKeys.has(p));
+        return pairs.length === 0 || !pairs.every((keys) => keys.some((key) => dismissedPairKeys.has(key)));
       }),
     [duplicateClusters, dismissedDuplicateKeys, dismissedPairKeys]
   );
@@ -308,7 +320,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       return next;
     });
     if (!cluster || !user) return;
-    const pairs = clusterPairKeys(cluster.rows.map((r) => r.task_text));
+    const pairs = clusterPairKeyGroups(cluster.rows.map((r) => r.task_text)).flat();
     if (pairs.length === 0) return;
     setDismissedPairKeys((prev) => {
       const next = new Set(prev);
