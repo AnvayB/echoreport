@@ -3,6 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
+import { resolveWhenHint } from "@/lib/scheduleHints";
+import { toast } from "sonner";
+import { addDays, isSameDay } from "date-fns";
+import {
+  TasksForTodayContext,
+  type TaskRow,
+  type TaskGroup,
+  type Bucket,
+  type PendingByBucket,
+  type DuplicateCluster,
+} from "./TasksForTodayContext";
 
 const stablePairKey = (a: string, b: string) => {
   const toStableKey = (text: string) => getTaskComparisonTokens(text).sort().join(" ") || text.trim().toLowerCase();
@@ -26,17 +37,6 @@ const clusterPairKeyGroups = (texts: string[]): string[][] => {
   }
   return groups;
 };
-import { resolveWhenHint } from "@/lib/scheduleHints";
-import { toast } from "sonner";
-import { addDays, isSameDay } from "date-fns";
-import {
-  TasksForTodayContext,
-  type TaskRow,
-  type TaskGroup,
-  type Bucket,
-  type PendingByBucket,
-  type DuplicateCluster,
-} from "./TasksForTodayContext";
 
 export { useTasksForToday } from "./TasksForTodayContext";
 export type { TaskRow, TaskGroup } from "./TasksForTodayContext";
