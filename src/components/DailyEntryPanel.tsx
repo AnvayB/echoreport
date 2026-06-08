@@ -116,17 +116,24 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   };
 
   // Parse a free-form text block into structured task items via the AI helper.
-  const parseToItems = async (text: string): Promise<ScheduleHint[]> => {
+  const parseToItems = async (
+    text: string,
+    section?: "completed" | "pending" | "blocker",
+    defaultWhen?: "today" | "tomorrow",
+  ): Promise<ScheduleHint[]> => {
     if (!text.trim()) return [];
     try {
       const { data, error } = await supabase.functions.invoke("ai-parse-tasks", {
-        body: { text, today_date: dateKey },
+        body: { text, today_date: dateKey, section, default_when: defaultWhen },
       });
       if (error) throw error;
       const items = Array.isArray(data?.items) ? data.items : [];
+      // Defensive cleanup in case the model leaves a leading bullet marker.
+      const stripBullet = (s: string) => s.replace(/^\s*(?:[-*•]\s+|\d+[.)]\s+)/, "").trim();
       return items
         .filter((i: any) => i && typeof i.text === "string")
-        .map((i: any) => ({ text: i.text, when: typeof i.when === "string" ? i.when : null }));
+        .map((i: any) => ({ text: stripBullet(i.text), when: typeof i.when === "string" ? i.when : null }))
+        .filter((i: ScheduleHint) => i.text.length > 0);
     } catch (e) {
       console.error("Failed to parse tasks:", e);
       return [];
@@ -137,9 +144,9 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
   const syncTasksFromEntry = async () => {
     if (!user) return;
     const [completedItems, pendingItems, blockerItems] = await Promise.all([
-      parseToItems(accomplishments),
-      parseToItems(pendingTasks),
-      parseToItems(blockers),
+      parseToItems(accomplishments, "completed"),
+      parseToItems(pendingTasks, "pending", "tomorrow"),
+      parseToItems(blockers, "blocker"),
     ]);
 
     // Dedupe each list while preserving the first when-hint we see for each unique item.
