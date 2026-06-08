@@ -32,7 +32,8 @@ serve(async (req) => {
 ${dateContext}
 
 You MUST respond by calling the parse_tasks tool. Rules:
-- Each item is a single, concise, action-oriented task line (no emojis, no bullet markers, no numbering).
+- Each item is a single, concise, action-oriented task line starting with an imperative verb (no emojis, no bullet markers, no numbering).
+- Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos (e.g., "too" used where "to" is meant). Preserve specifics (names, tools, context). Example: "need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
 - Split distinct tasks into separate items. Merge duplicate or trivially similar ones.
 - Preserve the user's intent and important specifics, but trim filler words.
 - For each task, set "when":
