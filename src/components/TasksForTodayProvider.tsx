@@ -2,22 +2,29 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
 
-const pairKey = (a: string, b: string) => {
+const stablePairKey = (a: string, b: string) => {
   const toStableKey = (text: string) => getTaskComparisonTokens(text).sort().join(" ") || text.trim().toLowerCase();
   const [x, y] = [toStableKey(a), toStableKey(b)].sort();
   return `${x}||${y}`;
 };
 
-const clusterPairKeys = (texts: string[]): string[] => {
-  const keys: string[] = [];
+const legacyPairKey = (a: string, b: string) => {
+  const [x, y] = [normalizeTaskText(a), normalizeTaskText(b)].sort();
+  return `${x}||${y}`;
+};
+
+const taskPairKeys = (a: string, b: string) => [...new Set([stablePairKey(a, b), legacyPairKey(a, b)])];
+
+const clusterPairKeyGroups = (texts: string[]): string[][] => {
+  const groups: string[][] = [];
   for (let i = 0; i < texts.length; i++) {
     for (let j = i + 1; j < texts.length; j++) {
-      keys.push(pairKey(texts[i], texts[j]));
+      groups.push(taskPairKeys(texts[i], texts[j]));
     }
   }
-  return keys;
+  return groups;
 };
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
