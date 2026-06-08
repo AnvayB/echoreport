@@ -301,9 +301,9 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       duplicateClusters.filter((c) => {
         if (dismissedDuplicateKeys.has(c.key)) return false;
         const texts = c.rows.map((r) => r.task_text);
-        const pairs = clusterPairKeys(texts);
+        const pairs = clusterPairKeyGroups(texts);
         // Hide cluster if every pairing in it has been dismissed as "keep both" before.
-        return pairs.length === 0 || !pairs.every((p) => dismissedPairKeys.has(p));
+        return pairs.length === 0 || !pairs.every((keys) => keys.some((key) => dismissedPairKeys.has(key)));
       }),
     [duplicateClusters, dismissedDuplicateKeys, dismissedPairKeys]
   );
@@ -316,7 +316,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       return next;
     });
     if (!cluster || !user) return;
-    const pairs = clusterPairKeys(cluster.rows.map((r) => r.task_text));
+    const pairs = clusterPairKeyGroups(cluster.rows.map((r) => r.task_text)).flat();
     if (pairs.length === 0) return;
     setDismissedPairKeys((prev) => {
       const next = new Set(prev);
