@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens } from "@/lib/taskUtils";
 
 const pairKey = (a: string, b: string) => {
-  const [x, y] = [normalizeTaskText(a), normalizeTaskText(b)].sort();
+  const toStableKey = (text: string) => getTaskComparisonTokens(text).sort().join(" ") || text.trim().toLowerCase();
+  const [x, y] = [toStableKey(a), toStableKey(b)].sort();
   return `${x}||${y}`;
 };
 
