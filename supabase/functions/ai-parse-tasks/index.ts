@@ -13,6 +13,8 @@ serve(async (req) => {
     const body = await req.json();
     const text: string = body?.text;
     const todayDate: string | undefined = body?.today_date; // YYYY-MM-DD from client (user's locale)
+    const defaultWhen: string | undefined = body?.default_when; // "today" | "tomorrow" | "this_week" | YYYY-MM-DD
+    const sectionHint: string | undefined = body?.section; // "completed" | "pending" | "blocker"
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Text is required" }), {
@@ -27,22 +29,36 @@ serve(async (req) => {
       ? `Today's date is ${todayDate} (YYYY-MM-DD).`
       : "";
 
+    const sectionContext = sectionHint === "pending"
+      ? `These items come from the user's "Pending / Tomorrow" section of an end-of-day journal — things they did NOT finish today and want to carry forward. Treat them as TOMORROW by default unless the user explicitly names a different time.`
+      : sectionHint === "completed"
+        ? `These items come from the user's "Accomplishments" section (already done).`
+        : sectionHint === "blocker"
+          ? `These items come from the user's "Blockers" section.`
+          : "";
+
+    const defaultWhenLine = defaultWhen
+      ? `If the user gives no time hint at all, default "when" to "${defaultWhen}".`
+      : `If the user gives no time hint at all, default "when" to "today".`;
+
     const systemPrompt = `You are a productivity assistant. Convert free-form text describing tasks into a clean array of concise, professional task items, each tagged with WHEN it should happen.
 
 ${dateContext}
 
+${sectionContext}
+
 You MUST respond by calling the parse_tasks tool. Rules:
-- Each item is a single, concise, action-oriented task line starting with an imperative verb (no emojis, no bullet markers, no numbering).
-- Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos (e.g., "too" used where "to" is meant). Preserve specifics (names, tools, context). Example: "need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
+- Each item is a single, concise, action-oriented task line starting with an imperative verb (no emojis, no bullet markers like "-" or "*", no numbering, no leading dashes).
+- Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos (e.g., "too" used where "to" is meant). Preserve specifics (names, tools, context). Example: "- need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
 - Split distinct tasks into separate items. Merge duplicate or trivially similar ones.
 - Preserve the user's intent and important specifics, but trim filler words.
 - For each task, set "when":
-  - "today" if the user implies today, ASAP, this morning/afternoon, or gives no time hint at all (default).
   - "tomorrow" if the user says tomorrow, next day, in the morning (when written at end of day), etc.
   - "this_week" if the user says this week, later this week, by Friday, by end of week.
   - A specific "YYYY-MM-DD" if the user names a weekday or date you can resolve (use today's date above as anchor; pick the next occurrence of that weekday).
-  - null if you genuinely cannot tell — caller will default to today.
-- Do NOT invent dates beyond what the text says. When in doubt, prefer "today" over guessing.
+  - "today" if the user explicitly says today, ASAP, this morning/afternoon.
+  - ${defaultWhenLine}
+- Do NOT invent dates beyond what the text says.
 - IMPORTANCE MARKER: If the user marks a task with the word "IMPORTANT" (any case), prefix that task's "text" with "!! " (two exclamation marks and a space) and remove the literal word "IMPORTANT" from the text. Do not add this prefix unless the user explicitly marked it important.
 - If no actionable tasks are found, return { "items": [] }.`;
 
