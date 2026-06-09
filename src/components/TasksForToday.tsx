@@ -100,14 +100,16 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           const age = formatAge(row.created_at);
           if (!age) return null;
           const days = daysSince(row.created_at) ?? 0;
-          const tone =
-            days >= 28
+        const tone =
+          days < 2
+            ? "bg-green-700/20 text-green-900 dark:text-green-100 border-green-700/40"
+            : days >= 28
               ? "bg-destructive/15 text-destructive border-destructive/40"
               : days >= 14
-              ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
-              : days >= 7
-              ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-              : "bg-muted/50 text-muted-foreground border-border";
+                ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
+                : days >= 7
+                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                  : "bg-muted/50 text-muted-foreground border-border";
           return (
             <span
               title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
