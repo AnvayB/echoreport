@@ -27,8 +27,9 @@ serve(async (req) => {
     const systemPrompt = `You group tasks by project, theme, or workstream so the user can scan them quickly.
 
 You MUST respond by calling the group_tasks tool. Rules:
-- Pick 2-6 short, specific group titles (2-5 words each) based on the actual tasks. Examples: "Databricks Integration", "Jira Sync", "ACL Coordination", "Hubspot Dataset". Avoid generic catch-alls like "Other" unless absolutely necessary.
-- Every input task id MUST appear in exactly ONE group. Do not invent ids. Do not drop any.
+- Pick 2-6 short, specific group titles (2-5 words each) based on the actual tasks. Examples: "Databricks Integration", "Jira Sync", "ACL Coordination", "Hubspot Dataset". Avoid generic catch-alls like "Other Tasks" unless a task truly doesn't fit any other group.
+- Every input task id MUST appear in exactly ONE group. Do not invent ids. Do not drop any ids. Count the input ids and verify your output has the same count.
+- If there are only 1-3 tasks total and they clearly belong to different themes, use one group per theme. If they're all related, use a single group.
 - Order groups roughly by size (largest first).
 - Within each group, preserve the order the tasks were given.`;
 

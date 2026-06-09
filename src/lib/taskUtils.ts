@@ -1,3 +1,15 @@
+// Strips common filler phrases from task text and rewrites as an imperative action item.
+// Applied client-side as a safety net so the behavior is LLM-agnostic.
+const FILLER_PREFIX_RE =
+  /^[\s\-*•]*(?:i\s+)?(?:need(?:ed)?\s+to|have\s+to|got\s+to|gotta|should|must|want\s+to|going\s+to|gonna|will|would\s+like\s+to|i(?:'m|'ll|'d)?\s+(?:going\s+to|gonna|need\s+to|want\s+to|will|should|plan\s+to|think\s+i\s+should|still\s+need\s+to)|still\s+need\s+to|also\s+need\s+to|we\s+need\s+to|we\s+should|also\s+(?:need|want)\s+to|try\s+to|remember\s+to|don't\s+forget\s+to|make\s+sure\s+to)\s+/i;
+
+export const stripTaskFiller = (text: string): string => {
+  const stripped = text.replace(FILLER_PREFIX_RE, "").trimStart();
+  if (!stripped) return text;
+  // Capitalize first letter without lowercasing the rest.
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+};
+
 export const normalizeTaskText = (text: string) =>
   text
     .toLowerCase()

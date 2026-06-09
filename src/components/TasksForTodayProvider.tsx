@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
-import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText } from "@/lib/taskUtils";
+import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText, stripTaskFiller } from "@/lib/taskUtils";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -514,7 +514,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       const seen: Array<{ text: string; when: string | null }> = [];
       rawItems.forEach((it) => {
         if (seen.some((e) => areTaskTextsEquivalent(e.text, it.text))) return;
-        seen.push({ text: it.text.trim(), when: it.when ?? null });
+        seen.push({ text: stripTaskFiller(it.text.trim()), when: it.when ?? null });
       });
       if (seen.length === 0) {
         toast.error("Couldn't extract any tasks from that text");

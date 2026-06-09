@@ -28,26 +28,33 @@ serve(async (req) => {
       .map((t: { id: string; task_text: string }) => `[id=${t.id}] ${t.task_text}`)
       .join("\n");
 
-    const systemPrompt = `You find DUPLICATE tasks in a user's todo list. Be VERY CONSERVATIVE — when in doubt, do NOT cluster.
+    const systemPrompt = `You find DUPLICATE tasks in a user's todo list. Be EXTREMELY CONSERVATIVE — when in doubt, return empty clusters.
 
-Two tasks are duplicates ONLY if they describe the SAME concrete piece of work: same action verb (or clear synonym) AND same specific object/deliverable. Different wording is fine, but the underlying work must be interchangeable — completing one would satisfy the other.
+Two tasks are duplicates ONLY when ALL of these are true:
+1. They describe the SAME action (or a clear synonym like enhance/improve, add/display, email/send).
+2. They have the SAME specific deliverable/object — not just the same project, person, or tool.
+3. Completing one task would fully satisfy the other with no remaining work.
 
-DUPLICATES (cluster these):
+DUPLICATES (same action + same deliverable):
 - "Enhance Project Hub user interface" / "Improve Project Hub UI"
 - "Add Customer Projects to CSP main page" / "Display Customer Projects on CSP homepage"
 - "Email Sarah about Q3 budget" / "Send Sarah the Q3 budget email"
 
-NOT DUPLICATES (do NOT cluster):
+NOT DUPLICATES — do NOT cluster these:
 - "Enhance Project Hub user interface" / "Develop product analytics view"  ← different deliverables
 - "Enhance Project Hub UI" / "Fix bug in Project Hub login"  ← same project, different work
-- "Review PR #123" / "Review PR #456"  ← same action, different targets
-- Two tasks that just share a project name, person, or tool
+- "Review PR #123" / "Review PR #456"  ← same action type, different specific targets
+- "Update DESIGN REVIEW with comments from Santhosh" / "Update KILLER BUGS with comments from Santhosh"  ← same template/pattern but DIFFERENT documents (DESIGN REVIEW ≠ KILLER BUGS)
+- "Update X with feedback from Alice" / "Update Y with feedback from Alice"  ← same collaborator is NOT enough; X and Y must be the same thing
+- Any two tasks that just share a project name, person name, or tool name
+
+CRITICAL RULE: Tasks that follow the same template or phrasing pattern (e.g., "Update [document] with [person]'s comments") are NOT duplicates unless [document] is identical. The specific noun or deliverable is what matters, not the surrounding words.
 
 You MUST respond by calling the report_duplicates tool. Rules:
 - Only return clusters of 2 or more task ids.
 - Each id must come from the input. Do not invent ids.
 - An id may appear in at most one cluster.
-- If unsure, return an empty clusters array. False positives are worse than misses.
+- Default to returning empty clusters. False positives are significantly worse than misses.
 - Provide a short reason (under 10 words) for each cluster.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

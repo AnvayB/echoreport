@@ -32,25 +32,27 @@ serve(async (req) => {
 
 ${dateContext}
 
-Fields:
-- "accomplishments": bullet list (lines starting with "- ") of things they completed or made progress on today.
-- "pending_tasks": bullet list of what's left to do, planned for tomorrow, or still in progress.
-- "blockers": bullet list of challenges, issues, blockers.
-- "notes": anything else — follow-ups, random thoughts, reminders.
-- "pending_task_schedule": parallel structured list of pending tasks with WHEN each should happen. The "text" of each item should match (or closely paraphrase) one bullet from "pending_tasks".
+FIELD DEFINITIONS — read carefully:
+- "accomplishments": Things ALREADY DONE or completed today (past tense). Bullet list (lines starting with "- "). Keep the user's wording as-is.
+- "pending_tasks": Things NOT YET DONE — planned for tomorrow or later, still in progress, or left over. Bullet list (lines starting with "- "). Rewrite as imperative action items (see rules below).
+- "blockers": Challenges, issues, or things blocking progress — regardless of tense. Bullet list. Keep user's wording.
+- "notes": Anything else — follow-ups, random thoughts, reminders, FYIs. Bullet list.
+- "pending_task_schedule": One entry per pending task with WHEN it should happen. The "text" field must closely match the corresponding bullet in "pending_tasks".
+
+CRITICAL: Do NOT put the same item in both accomplishments and pending_tasks. If a task is done → accomplishments. If not done → pending_tasks.
 
 For each pending task's "when":
-- "today" if the user implies today / no specific date.
-- "tomorrow" if they say tomorrow / next day / in the morning (since this is end-of-day journaling, "tomorrow" is common).
-- "this_week" if they say later this week / by Friday / by end of week.
-- A specific "YYYY-MM-DD" if they name a weekday or date you can resolve from the anchor date.
+- "tomorrow" if they say tomorrow, next day, or morning (this is end-of-day, so "tomorrow" is the most common).
+- "this_week" if they say this week, by Friday, by end of week.
+- A specific "YYYY-MM-DD" if they name a weekday or date resolvable from the anchor date.
+- "today" if they say today, ASAP, or now.
 - null if genuinely unclear.
 
 Rules:
 - Use bullet points (lines starting with "- ") within the four text fields.
 - If a category has nothing, return an empty string "" (or empty array for pending_task_schedule).
 - For "accomplishments", "blockers", and "notes": keep the user's wording as much as possible.
-- ACTION-ITEM REWRITE for pending tasks: In BOTH "pending_tasks" bullets and "pending_task_schedule" entries, rewrite each item as a concise, imperative action item starting with a verb. Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos (e.g., "too" used where "to" is meant). Preserve all specifics (names, tools, context). Example: "- need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
+- ACTION-ITEM REWRITE for pending tasks only: Rewrite each pending item as a concise, imperative action starting with a verb. Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos. Preserve all specifics (names, tools, context). Example: "need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
 - IMPORTANCE MARKER: If a task is marked with the word "IMPORTANT" (any case) by the user, prefix that task's text with "!! " (two exclamation marks and a space) in BOTH "pending_tasks" bullets and "pending_task_schedule" entries, and remove the literal word "IMPORTANT" from the text. Do not add this prefix unless the user explicitly marked the task important.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

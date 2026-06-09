@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VoiceInput from "./VoiceInput";
 import { formatDateKey, formatDayLabel } from "@/lib/weekUtils";
-import { areTaskTextsEquivalent, mergeDuplicateTaskRows, normalizeTaskText } from "@/lib/taskUtils";
+import { areTaskTextsEquivalent, mergeDuplicateTaskRows, normalizeTaskText, stripTaskFiller } from "@/lib/taskUtils";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { Save, Loader2, Sparkles, Pencil } from "lucide-react";
@@ -92,13 +92,22 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       });
       if (error) throw error;
       setAccomplishments(data.accomplishments || "");
-      setPendingTasks(data.pending_tasks || "");
+      // Strip filler from each bullet in the pending_tasks block as a safety net.
+      const cleanedPendingTasks = (data.pending_tasks || "")
+        .split("\n")
+        .map((line: string) => {
+          const bulletMatch = line.match(/^(\s*[-*•]\s*)(.*)/);
+          if (bulletMatch) return bulletMatch[1] + stripTaskFiller(bulletMatch[2]);
+          return line.trim() ? stripTaskFiller(line) : line;
+        })
+        .join("\n");
+      setPendingTasks(cleanedPendingTasks);
       setBlockers(data.blockers || "");
       setNotes(data.notes || "");
       const schedule: ScheduleHint[] = Array.isArray(data?.pending_task_schedule)
         ? data.pending_task_schedule
             .filter((s: any) => s && typeof s.text === "string")
-            .map((s: any) => ({ text: s.text, when: typeof s.when === "string" ? s.when : null }))
+            .map((s: any) => ({ text: stripTaskFiller(s.text), when: typeof s.when === "string" ? s.when : null }))
         : [];
       setPendingTaskSchedule(schedule);
       setParsed(true);
@@ -128,11 +137,12 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       });
       if (error) throw error;
       const items = Array.isArray(data?.items) ? data.items : [];
-      // Defensive cleanup in case the model leaves a leading bullet marker.
-      const stripBullet = (s: string) => s.replace(/^\s*(?:[-*•]\s+|\d+[.)]\s+)/, "").trim();
+      // Defensive cleanup: strip leading bullet markers and filler phrases.
+      const cleanItem = (s: string) =>
+        stripTaskFiller(s.replace(/^\s*(?:[-*•]\s+|\d+[.)]\s+)/, "").trim());
       return items
         .filter((i: any) => i && typeof i.text === "string")
-        .map((i: any) => ({ text: stripBullet(i.text), when: typeof i.when === "string" ? i.when : null }))
+        .map((i: any) => ({ text: cleanItem(i.text), when: typeof i.when === "string" ? i.when : null }))
         .filter((i: ScheduleHint) => i.text.length > 0);
     } catch (e) {
       console.error("Failed to parse tasks:", e);
@@ -226,7 +236,6 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       );
       if (alreadyManuallyCompleted) return;
 
-      const normalized = normalizeTaskText(taskText);
       const matchingPending = uniqueOpenRows.find(
         (row) => ["pending", "pending:manual", "blocker"].includes(row.section) && areTaskTextsEquivalent(row.task_text, taskText)
       );
@@ -239,17 +248,20 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       rows.push({ user_id: user.id, task_date: dateKey, section: "completed", task_text: taskText, completed: true });
     });
 
+    const isAlreadyManuallyCompleted = (taskText: string) =>
+      (manualCompletedRows ?? []).some((row) => areTaskTextsEquivalent(row.task_text, taskText));
+
     uniquePendingHints.forEach(({ text: taskText, when }) => {
-      const normalized = normalizeTaskText(taskText);
-      if (completedKeys.has(normalized)) return;
+      if (completedKeys.has(normalizeTaskText(taskText))) return;
+      if (isAlreadyManuallyCompleted(taskText)) return;
       if (uniqueOpenRows.some((row) => row.section.startsWith("pending") && areTaskTextsEquivalent(row.task_text, taskText))) return;
       const taskDate = resolveWhenHint(when, date, dateKey);
       rows.push({ user_id: user.id, task_date: taskDate, section: "pending", task_text: taskText, completed: false });
     });
 
     uniqueBlockerItems.forEach((taskText) => {
-      const normalized = normalizeTaskText(taskText);
-      if (completedKeys.has(normalized)) return;
+      if (completedKeys.has(normalizeTaskText(taskText))) return;
+      if (isAlreadyManuallyCompleted(taskText)) return;
       if (uniqueOpenRows.some((row) => row.section === "blocker" && areTaskTextsEquivalent(row.task_text, taskText))) return;
       rows.push({ user_id: user.id, task_date: dateKey, section: "blocker", task_text: taskText, completed: false });
     });
@@ -287,19 +299,22 @@ const DailyEntryPanel = ({ date, onSaved }: DailyEntryPanelProps) => {
       },
       { onConflict: "user_id,entry_date" }
     );
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast.error("Failed to save entry");
       console.error(error);
-    } else {
-      toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
-      setIsFirstSave(false);
-      onSaved();
-      syncTasksFromEntry().catch((taskSyncError) => {
-        console.error(taskSyncError);
-        toast.error("Saved entry, but task syncing failed");
-      });
+      return;
     }
+    toast.success(isFirstSave ? "Logged! See you tomorrow!" : "Logged!");
+    setIsFirstSave(false);
+    try {
+      await syncTasksFromEntry();
+    } catch (taskSyncError) {
+      console.error(taskSyncError);
+      toast.error("Saved entry, but task syncing failed");
+    }
+    setSaving(false);
+    onSaved();
   };
 
   const handleEditRaw = () => {

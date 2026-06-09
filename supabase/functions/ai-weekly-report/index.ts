@@ -25,7 +25,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { entries, tasks, emailTemplate, weekLabel } = await req.json();
+    const { entries, tasks, thisWeekPending, nextWeekPending, backlogPending, emailTemplate, weekLabel } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
@@ -38,7 +38,6 @@ serve(async (req) => {
     // Group tasks by completion / carryover (based on AUTHORITATIVE checkbox state)
     const taskList: DailyTask[] = Array.isArray(tasks) ? tasks : [];
     const completedTasks = taskList.filter((t) => t.completed);
-    const pendingTasks = taskList.filter((t) => !t.completed && (t.section === "pending" || t.section === "pending:manual"));
     const blockerTasks = taskList.filter((t) => !t.completed && t.section === "blocker");
 
     const fmtTaskList = (rows: DailyTask[]) =>
@@ -46,9 +45,22 @@ serve(async (req) => {
         ? "  (none)"
         : rows.map((r) => `  - [${r.task_date}] ${r.task_text}`).join("\n");
 
-    const taskSummary = `\n\n## Authoritative checkbox state for the week\n` +
-      `### Completed (checked off)\n${fmtTaskList(completedTasks)}\n\n` +
-      `### Still Pending (carries into next week)\n${fmtTaskList(pendingTasks)}\n\n` +
+    // Use tiered pending data if provided (new clients), otherwise fall back to flat list
+    const slippedThisWeek: DailyTask[] = Array.isArray(thisWeekPending)
+      ? (thisWeekPending as DailyTask[]).filter((t) => t.section !== "blocker")
+      : taskList.filter((t) => !t.completed && (t.section === "pending" || t.section === "pending:manual"));
+    const plannedNextWeek: DailyTask[] = Array.isArray(nextWeekPending)
+      ? (nextWeekPending as DailyTask[]).filter((t) => t.section !== "blocker")
+      : [];
+    const olderBacklog: DailyTask[] = Array.isArray(backlogPending)
+      ? (backlogPending as DailyTask[]).filter((t) => t.section !== "blocker")
+      : [];
+
+    const taskSummary = `\n\n## Authoritative task state for the week\n` +
+      `### Completed (checked off this week)\n${fmtTaskList(completedTasks)}\n\n` +
+      `### Slipped this week (scheduled for this week, not completed)\n${fmtTaskList(slippedThisWeek)}\n\n` +
+      `### Explicitly planned for next week\n${fmtTaskList(plannedNextWeek)}\n\n` +
+      `### Older backlog (select only if directly relevant to this week's work themes)\n${fmtTaskList(olderBacklog)}\n\n` +
       `### Open Blockers\n${fmtTaskList(blockerTasks)}\n`;
 
     const templateInstruction = emailTemplate
@@ -57,12 +69,16 @@ serve(async (req) => {
 
     const systemPrompt = `You are a professional assistant that writes weekly status update emails. ${templateInstruction}
 
-Replace any placeholders with actual content. Use the AUTHORITATIVE checkbox state as the source of truth for what is completed vs. carryover — it represents the user's actual progress. The daily entry text supplies highlights, lowlights, narrative context, and notes.
+Replace any placeholders with actual content. Use the AUTHORITATIVE task state as the source of truth for what is completed vs. carry-over. The daily entry text supplies narrative, highlights, and context.
 
 Rules:
-- "Completed Tasks" / accomplishments must come from the checked-off task list (and may be enriched with narrative from the entries).
-- "Carry-over" / "Next Week" must come from the still-pending task list. Do NOT include items the user already checked off.
-- Open blockers go under blockers/challenges.
+- "Completed Tasks" / accomplishments must come only from the checked-off task list (enrich with entry narrative where helpful).
+- "Carry-over / Next Week" selection rules — be SELECTIVE, not exhaustive:
+  1. Always include tasks from "Slipped this week" — these are things you intended to do but didn't finish.
+  2. Always include tasks from "Explicitly planned for next week" — these are intentional.
+  3. From "Older backlog": include ONLY items that are clearly related to this week's completed work or themes. Skip generic long-running items that have no connection to the current week.
+  4. Do NOT just dump the entire backlog. A realistic carry-over list has 3–8 focused items.
+- Open blockers go under the blockers/challenges section.
 - Output the full email as plain text ready to copy-paste. No markdown code fences.`;
 
     const userPrompt = `Generate my weekly status update email for the week of ${weekLabel}.

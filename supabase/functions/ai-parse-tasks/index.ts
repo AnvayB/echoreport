@@ -30,11 +30,11 @@ serve(async (req) => {
       : "";
 
     const sectionContext = sectionHint === "pending"
-      ? `These items come from the user's "Pending / Tomorrow" section of an end-of-day journal — things they did NOT finish today and want to carry forward. Treat them as TOMORROW by default unless the user explicitly names a different time.`
+      ? `These items come from the user's "Pending / Tomorrow" section of an end-of-day journal — things they did NOT finish today and want to carry forward. Even if phrased in past tense or as observations, treat them as future action items. Treat them as TOMORROW by default unless the user explicitly names a different time.`
       : sectionHint === "completed"
-        ? `These items come from the user's "Accomplishments" section (already done).`
+        ? `These items come from the user's "Accomplishments" section — things already done today. Extract each distinct completed item.`
         : sectionHint === "blocker"
-          ? `These items come from the user's "Blockers" section.`
+          ? `These items come from the user's "Blockers" section — challenges or stuck items that need follow-up.`
           : "";
 
     const defaultWhenLine = defaultWhen
