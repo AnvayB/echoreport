@@ -53,6 +53,7 @@ export interface TasksForTodayContextValue {
   dismissDuplicateCluster: (key: string) => void;
   toggleTask: (row: TaskRow) => Promise<void>;
   setTaskImportant: (row: TaskRow, important: boolean) => Promise<void>;
+  editTaskText: (row: TaskRow, newText: string) => Promise<void>;
   deleteTask: (row: TaskRow) => Promise<void>;
   moveTaskToBucket: (row: TaskRow, bucket: Bucket) => Promise<void>;
   addMoreTasks: () => Promise<void>;

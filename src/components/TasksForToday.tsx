@@ -26,7 +26,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
-    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant,
+    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant, editTaskText,
     isViewingToday, bucketLabels,
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
@@ -35,6 +35,8 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
 
   const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
@@ -60,84 +62,130 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     const isSaved = savedId === row.id;
     const isDragging = draggingId === row.id;
     const important = isTaskImportant(row.task_text);
+    const isEditing = editingId === row.id;
+
+    const startEdit = () => {
+      setEditingId(row.id);
+      setEditingText(row.task_text);
+    };
+
+    const cancelEdit = () => {
+      setEditingId(null);
+      setEditingText("");
+    };
+
+    const saveEdit = async () => {
+      await editTaskText(row, editingText);
+      setEditingId(null);
+      setEditingText("");
+    };
+
     return (
       <ContextMenu key={row.id}>
         <ContextMenuTrigger asChild>
-      <label
-        draggable
-        onDragStart={(e) => {
-          setDraggingId(row.id);
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", row.id);
-        }}
-        onDragEnd={() => {
-          setDraggingId(null);
-          setDragOverBucket(null);
-        }}
-        className={`flex items-start gap-1.5 cursor-pointer group transition-opacity ${isDragging ? "opacity-40" : ""}`}
-      >
-        <GripVertical className="h-3.5 w-3.5 mt-0.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing" />
-        <Checkbox
-          checked={row.completed}
-          onCheckedChange={() => toggleTask(row)}
-          className="mt-0.5"
-          disabled={isSaving}
-        />
-        <span
-          className={`text-sm leading-snug transition-all flex-1 ${
-            row.completed ? "line-through text-muted-foreground" : "text-foreground"
-          }`}
-        >
-          <TaskText text={row.task_text} muted={row.completed} />
-        </span>
-        {isSaving && <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />}
-        {isSaved && !isSaving && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
-            <Check className="h-3 w-3" /> Saved
-          </span>
-        )}
-        {(() => {
-          const age = formatAge(row.created_at);
-          if (!age) return null;
-          const days = daysSince(row.created_at) ?? 0;
-          const tone =
-            days < 2
-              ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
-              : days >= 28
-                ? "bg-destructive/15 text-destructive border-destructive/40"
-                : days >= 14
-                  ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
-                  : days >= 7
-                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                    : "bg-muted/50 text-muted-foreground border-border";
-          return (
-            <span
-              title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
-              className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-0 text-[10px] leading-4 font-medium tabular-nums ${tone}`}
-            >
-              {age}
-            </span>
-          );
-        })()}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            deleteTask(row);
-          }}
-          disabled={isSaving}
-          aria-label="Remove task"
-          className="mt-0.5 shrink-0 text-muted-foreground/60 hover:text-destructive opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </label>
+          <label
+            draggable={!isEditing}
+            onDragStart={(e) => {
+              if (isEditing) return;
+              setDraggingId(row.id);
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", row.id);
+            }}
+            onDragEnd={() => {
+              setDraggingId(null);
+              setDragOverBucket(null);
+            }}
+            className={`flex items-start gap-1.5 cursor-pointer group transition-opacity ${isDragging ? "opacity-40" : ""} ${isEditing ? "cursor-default" : ""}`}
+          >
+            <GripVertical className={`h-3.5 w-3.5 mt-0.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing ${isEditing ? "opacity-0 pointer-events-none" : ""}`} />
+            <Checkbox
+              checked={row.completed}
+              onCheckedChange={() => toggleTask(row)}
+              className="mt-0.5"
+              disabled={isSaving || isEditing}
+            />
+            {isEditing ? (
+              <div className="flex-1 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                <Textarea
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  className="min-h-[40px] text-sm"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      saveEdit();
+                    }
+                    if (e.key === "Escape") {
+                      cancelEdit();
+                    }
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={saveEdit} disabled={!editingText.trim() || editingText.trim() === row.task_text}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={cancelEdit}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <span
+                className={`text-sm leading-snug transition-all flex-1 ${
+                  row.completed ? "line-through text-muted-foreground" : "text-foreground"
+                }`}
+              >
+                <TaskText text={row.task_text} muted={row.completed} />
+              </span>
+            )}
+            {isSaving && <Loader2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground animate-spin shrink-0" />}
+            {isSaved && !isSaving && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 shrink-0 animate-fade-in">
+                <Check className="h-3 w-3" /> Saved
+              </span>
+            )}
+            {!isEditing && (() => {
+              const age = formatAge(row.created_at);
+              if (!age) return null;
+              const days = daysSince(row.created_at) ?? 0;
+              const tone =
+                days < 2
+                  ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
+                  : days >= 28
+                    ? "bg-destructive/15 text-destructive border-destructive/40"
+                    : days >= 14
+                      ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
+                      : days >= 7
+                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                        : "bg-muted/50 text-muted-foreground border-border";
+              return (
+                <span
+                  title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
+                  className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-0 text-[10px] leading-4 font-medium tabular-nums ${tone}`}
+                >
+                  {age}
+                </span>
+              );
+            })()}
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  deleteTask(row);
+                }}
+                disabled={isSaving}
+                aria-label="Remove task"
+                className="mt-0.5 shrink-0 text-muted-foreground/60 hover:text-destructive opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </label>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
           <ContextMenuItem onSelect={() => setTaskImportant(row, !important)}>
             {important ? "Mark as unimportant" : "Mark as important"}
           </ContextMenuItem>
+          <ContextMenuItem onSelect={startEdit}>Edit text</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
     );
