@@ -631,6 +631,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         adding,
         toggleTask,
         setTaskImportant,
+        editTaskText,
         deleteTask,
         moveTaskToBucket,
         addMoreTasks,
