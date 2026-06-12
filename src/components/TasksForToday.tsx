@@ -26,7 +26,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
-    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant,
+    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant, editTaskText,
     isViewingToday, bucketLabels,
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
