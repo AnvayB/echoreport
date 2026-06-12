@@ -540,6 +540,43 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
   };
 
+  const editTaskText = async (row: TaskRow, newText: string) => {
+    if (!user) return;
+    const trimmed = newText.trim();
+    if (!trimmed || trimmed === row.task_text) return;
+    const updater = (list: TaskRow[]) =>
+      list.map((r) => (r.id === row.id ? { ...r, task_text: trimmed } : r));
+    const prevPending = pending;
+    const prevBlockers = blockers;
+    const prevCompletedToday = completedToday;
+    const prevCompletedYesterday = completedYesterday;
+    const prevGroups = pendingGroups;
+    setPending(updater);
+    setBlockers(updater);
+    setCompletedToday(updater);
+    setCompletedYesterday(updater);
+    setPendingGroups((groups) =>
+      groups
+        ? groups.map((g) => ({ ...g, rows: updater(g.rows) }))
+        : groups
+    );
+
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update({ task_text: trimmed })
+      .eq("id", row.id);
+    if (error) {
+      toast.error("Couldn't update task");
+      setPending(prevPending);
+      setBlockers(prevBlockers);
+      setCompletedToday(prevCompletedToday);
+      setCompletedYesterday(prevCompletedYesterday);
+      setPendingGroups(prevGroups);
+      return;
+    }
+    toast.success("Task updated");
+  };
+
   const setTaskImportant = async (row: TaskRow, important: boolean) => {
     if (!user) return;
     if (isTaskImportant(row.task_text) === important) return;
