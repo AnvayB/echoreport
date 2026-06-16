@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -339,7 +339,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks
           <Popover>
@@ -379,6 +379,15 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             </PopoverContent>
           </Popover>
         </CardTitle>
+        <button
+          type="button"
+          onClick={reload}
+          disabled={loading || adding}
+          aria-label="Refresh tasks"
+          className={`text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50 ${loading ? "animate-spin" : ""}`}
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
       </CardHeader>
       <CardContent>
         {loading && !loaded && (
