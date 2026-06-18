@@ -527,9 +527,6 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                   <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks</>
                 )}
               </Button>
-              <Button onClick={reload} variant="ghost" size="sm" disabled={adding || loading}>
-                Refresh
-              </Button>
             </div>
           </div>
         )}
