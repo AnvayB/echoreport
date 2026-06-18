@@ -563,7 +563,15 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             >
               <Dices className="h-4 w-4 mr-1.5" /> Re-roll
             </Button>
-            <Button onClick={() => setDiceOpen(false)}>Let's do it</Button>
+            <Button
+              onClick={() => {
+                if (randomTask) moveTaskToBucket(randomTask, "today");
+                setDiceOpen(false);
+              }}
+              disabled={!randomTask}
+            >
+              Let's do it
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
