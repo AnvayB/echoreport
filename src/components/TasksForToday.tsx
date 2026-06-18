@@ -40,6 +40,32 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const [diceOpen, setDiceOpen] = useState(false);
+  const [randomTask, setRandomTask] = useState<TaskRow | null>(null);
+
+  const rollRandomTask = () => {
+    if (pending.length === 0) {
+      setRandomTask(null);
+      return;
+    }
+    if (pending.length === 1) {
+      setRandomTask(pending[0]);
+      return;
+    }
+    let next = pending[Math.floor(Math.random() * pending.length)];
+    // avoid repeating the same one back-to-back
+    let guard = 0;
+    while (randomTask && next.id === randomTask.id && guard < 10) {
+      next = pending[Math.floor(Math.random() * pending.length)];
+      guard++;
+    }
+    setRandomTask(next);
+  };
+
+  const openDice = () => {
+    rollRandomTask();
+    setDiceOpen(true);
+  };
 
   const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
