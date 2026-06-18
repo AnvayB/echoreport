@@ -408,15 +408,27 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             </PopoverContent>
           </Popover>
         </CardTitle>
-        <button
-          type="button"
-          onClick={reload}
-          disabled={loading || adding}
-          aria-label="Refresh tasks"
-          className={`text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50 ${loading ? "animate-spin" : ""}`}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openDice}
+            disabled={loading || adding || pending.length === 0}
+            aria-label="Pick a random task"
+            title="Pick a random task"
+            className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <Dices className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={reload}
+            disabled={loading || adding}
+            aria-label="Refresh tasks"
+            className={`text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50 ${loading ? "animate-spin" : ""}`}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && !loaded && (
