@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import {
   ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
 } from "@/components/ui/context-menu";
@@ -37,6 +40,32 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const [diceOpen, setDiceOpen] = useState(false);
+  const [randomTask, setRandomTask] = useState<TaskRow | null>(null);
+
+  const rollRandomTask = () => {
+    if (pending.length === 0) {
+      setRandomTask(null);
+      return;
+    }
+    if (pending.length === 1) {
+      setRandomTask(pending[0]);
+      return;
+    }
+    let next = pending[Math.floor(Math.random() * pending.length)];
+    // avoid repeating the same one back-to-back
+    let guard = 0;
+    while (randomTask && next.id === randomTask.id && guard < 10) {
+      next = pending[Math.floor(Math.random() * pending.length)];
+      guard++;
+    }
+    setRandomTask(next);
+  };
+
+  const openDice = () => {
+    rollRandomTask();
+    setDiceOpen(true);
+  };
 
   const daysSince = (createdAt?: string) => {
     if (!createdAt) return null;
@@ -379,15 +408,27 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             </PopoverContent>
           </Popover>
         </CardTitle>
-        <button
-          type="button"
-          onClick={reload}
-          disabled={loading || adding}
-          aria-label="Refresh tasks"
-          className={`text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50 ${loading ? "animate-spin" : ""}`}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openDice}
+            disabled={loading || adding || pending.length === 0}
+            aria-label="Pick a random task"
+            title="Pick a random task"
+            className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <Dices className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={reload}
+            disabled={loading || adding}
+            aria-label="Refresh tasks"
+            className={`text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50 ${loading ? "animate-spin" : ""}`}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && !loaded && (
@@ -493,6 +534,39 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           </div>
         )}
       </CardContent>
+      <Dialog open={diceOpen} onOpenChange={setDiceOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Dices className="h-5 w-5" /> Your random task
+            </DialogTitle>
+            <DialogDescription>
+              Can't decide what to do next? Let the dice pick for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-foreground bg-muted/50 p-4 min-h-[80px] flex items-center">
+            {randomTask ? (
+              <span className="text-base leading-snug text-foreground">
+                <TaskText text={randomTask.task_text} />
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground italic">
+                No pending tasks to pick from.
+              </span>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-between gap-2">
+            <Button
+              variant="outline"
+              onClick={rollRandomTask}
+              disabled={pending.length < 2}
+            >
+              <Dices className="h-4 w-4 mr-1.5" /> Re-roll
+            </Button>
+            <Button onClick={() => setDiceOpen(false)}>Let's do it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
