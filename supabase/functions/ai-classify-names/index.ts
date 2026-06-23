@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              "You are a strict verifier. For each candidate, decide whether it is unambiguously a real person's name given the contexts. Reject anything that could plausibly be a company, product, tool, project, repo, place, acronym, or generic noun. When in doubt, REJECT.",
+              "You verify whether candidates are person names. Accept uncommon, international, or variant name spellings (e.g. 'Eugenie', 'Parag', 'Santhosh', 'Gilles', 'Alvin'). If a word is plausibly a person's given name or surname — even if rare in English — confirm it as a name. Only reject if it is clearly a product, company, tool, project, repo, acronym, or common English word. When in doubt about whether it's a name or a product/tool, REJECT — but give names the benefit of the doubt.",
           },
           {
             role: "user",

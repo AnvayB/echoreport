@@ -98,6 +98,16 @@ export async function setVerdict(token: string, isName: boolean): Promise<void> 
   }
 }
 
+/** Clear cached verdicts for specific tokens, forcing re-classification on next render. */
+export function clearVerdicts(tokens: string[]) {
+  const c = loadCache();
+  for (const t of tokens) {
+    const key = normalize(t);
+    if (key) delete c[key];
+  }
+  persist();
+}
+
 /** Submit candidate tokens for AI classification. Debounced/batched. */
 const queue: Map<string, Set<string>> = new Map();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -148,11 +158,9 @@ async function flush() {
     const notNameSet = new Set(notNames.map(normalize));
     const c = loadCache();
     for (const t of batch) {
-      // Prefer explicit verdicts from server; fall back to "not_name" for
-      // anything in the batch the server didn't return (defensive).
       if (nameSet.has(t)) c[t] = "name";
       else if (notNameSet.has(t)) c[t] = "not_name";
-      else c[t] = "not_name";
+      // else: AI omitted this token — leave uncached so it retries next render
     }
     persist();
     notify();

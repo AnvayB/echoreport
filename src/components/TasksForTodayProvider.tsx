@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText, stripTaskFiller } from "@/lib/taskUtils";
+import { clearVerdicts } from "@/lib/nameVerification";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -544,6 +545,12 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (!user) return;
     const trimmed = newText.trim();
     if (!trimmed || trimmed === row.task_text) return;
+
+    // Clear cached name verdicts for capitalized tokens in the new text so
+    // TaskText re-classifies them fresh with the updated context.
+    const caps = trimmed.match(/\b[A-Z][a-z]{1,}\b/g) ?? [];
+    if (caps.length) clearVerdicts(caps);
+
     const updater = (list: TaskRow[]) =>
       list.map((r) => (r.id === row.id ? { ...r, task_text: trimmed } : r));
     const prevPending = pending;

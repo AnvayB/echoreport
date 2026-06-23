@@ -48,9 +48,11 @@ ${dateContext}
 ${sectionContext}
 
 You MUST respond by calling the parse_tasks tool. Rules:
+- The input may be a raw voice-to-text transcript with speech artifacts. Before extracting tasks: fix word repetitions and stutters (e.g. "update updated" → "updated", "that so that" → "that so") without changing meaning.
 - Each item is a single, concise, action-oriented task line starting with an imperative verb (no emojis, no bullet markers like "-" or "*", no numbering, no leading dashes).
 - Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos (e.g., "too" used where "to" is meant). Preserve specifics (names, tools, context). Example: "- need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
-- Split distinct tasks into separate items. Merge duplicate or trivially similar ones.
+- Sequential steps toward the same concrete goal MUST be merged into ONE task. Example: "Add the workspace page for Parag to have BiFlow info" + "get that hardcoded into the site and publish" → one task: "Add workspace page for Parag with BiFlow info hardcoded and publish". Only create separate tasks when the work items are genuinely independent — different systems, different people, or goals that could be done in any order.
+- Merge duplicate or trivially similar items into one.
 - Preserve the user's intent and important specifics, but trim filler words.
 - For each task, set "when":
   - "tomorrow" if the user says tomorrow, next day, in the morning (when written at end of day), etc.

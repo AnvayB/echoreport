@@ -10,6 +10,13 @@ interface VoiceInputProps {
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
+const cleanVoiceTranscript = (text: string): string =>
+  text
+    .replace(/"(\w)/g, "quote $1")      // spoken "quote" → STT renders as " before a word
+    .replace(/\b(\w+)\s+\1\b/gi, "$1") // exact duplicate consecutive words
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
 const VoiceInput = ({ onTranscript, onInterimTranscript }: VoiceInputProps) => {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -33,7 +40,7 @@ const VoiceInput = ({ onTranscript, onInterimTranscript }: VoiceInputProps) => {
       const last = event.results[event.results.length - 1];
       if (last.isFinal) {
         onInterimTranscript?.("");
-        onTranscript(last[0].transcript);
+        onTranscript(cleanVoiceTranscript(last[0].transcript));
       } else {
         onInterimTranscript?.(last[0].transcript);
       }
