@@ -3,7 +3,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-const STORAGE_KEY = "nameVerify.v1";
+const STORAGE_KEY = "nameVerify.v2";
 const MAX_CACHE = 1000;
 
 type Verdict = "name" | "not_name";

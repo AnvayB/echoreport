@@ -1,0 +1,1 @@
+DELETE FROM public.known_names WHERE token = 'Eugenie' AND is_name = false;
