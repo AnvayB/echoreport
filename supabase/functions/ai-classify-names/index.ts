@@ -114,9 +114,11 @@ Deno.serve(async (req) => {
 
     const systemPrompt = [
       "You classify capitalized tokens extracted from short work-task notes.",
-      "For each token, decide if it refers to a REAL PERSON (someone the writer would email, call, message, or meet with) given the surrounding task text.",
+      "For each token, decide if it refers to a REAL PERSON (someone the writer would email, call, message, meet with, or reference by name) given the surrounding task text.",
       "",
-      "Mark as PERSON only when the context strongly supports it: e.g. 'sync with Gilles', 'email Sarah about Q3', 'ask Marie for feedback', 'thank Jon for the PR'.",
+      "Mark as PERSON when the context supports it: e.g. 'sync with Gilles', 'email Sarah about Q3', 'ask Marie for feedback', 'thank Jon for the PR', \"Eugenie's request\", \"Parag's feedback\", 'per Santhosh'.",
+      "Possessive forms ('s) and references like 'X's request/feedback/idea/ask' almost always indicate a person.",
+      "Accept uncommon, international, or variant given-name spellings (Eugenie, Parag, Santhosh, Gilles, Alvin, Aoife, Yuki). If a token is plausibly a given name or surname and the context fits a person, mark it as a person.",
       "",
       "Mark as NOT a person for:",
       "- Company names (Arteris, Stripe, Acme)",
@@ -126,8 +128,7 @@ Deno.serve(async (req) => {
       "- Acronyms, ticket IDs, model names, generic capitalized nouns",
       "- Sentence-initial verbs/nouns that happen to be capitalized",
       "",
-      "When uncertain, EXCLUDE. False positives are worse than misses — the user has no way to correct them.",
-      "Use ALL provided contexts for a token together before deciding. The same token across multiple contexts that all clearly refer to a person is a strong signal; mixed/ambiguous usage → exclude.",
+      "Use ALL provided contexts for a token together before deciding. The same token across multiple contexts that all clearly refer to a person is a strong signal; mixed/ambiguous usage → exclude. Only exclude when the token is clearly a product/company/tool/project, not just because the name is unfamiliar.",
     ].join("\n");
 
     const userPrompt =
