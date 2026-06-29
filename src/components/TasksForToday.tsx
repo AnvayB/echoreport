@@ -412,47 +412,52 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Task tips"
-                  className="text-muted-foreground/70 hover:text-foreground transition-colors"
-                >
-                  <Info className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent align="start" className="w-80 text-sm space-y-3 p-4" side="bottom">
-                <p className="font-semibold text-foreground">Tips for managing tasks</p>
-                <ul className="list-disc pl-5 space-y-2 text-muted-foreground marker:text-muted-foreground/60">
-                  <li>
-                    <span className="font-medium text-foreground">Right-click any task</span> — edit its text, or mark it as important/unimportant. Backlog group titles can also be renamed by right-clicking them.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">Schedule tasks inline</span> — write phrases like
-                    <span className="text-foreground"> "due tomorrow"</span>,
-                    <span className="text-foreground"> "this week"</span>, or on Fridays
-                    <span className="text-foreground"> "on Monday"</span> /
-                    <span className="text-foreground"> "next week"</span> and they'll land in the right bucket.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">Mark as IMPORTANT</span> — add the word
-                    <span className="text-foreground"> IMPORTANT</span> to a task and it'll appear
-                    <span className="font-bold text-foreground"> bolded</span> in your list.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">People recognition</span> — names you mention get a
-                    <span className="inline-flex items-center rounded-full border border-primary/60 bg-primary/5 px-1.5 py-0 text-[0.82em] font-medium text-primary mx-1 align-baseline">pill</span>
-                    border so it's easy to spot who's involved.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">Voice input</span> — tap the mic and brain‑dump your tasks naturally; they'll be parsed and grouped for you.
-                  </li>
-                </ul>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Task tips"
+                className="text-muted-foreground/70 hover:text-foreground transition-colors"
+              >
+                <Info className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" side="bottom" className="w-80 p-3">
+              <p className="font-semibold text-foreground text-sm mb-2">Tips for managing tasks</p>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="rightclick" className="border-b-0">
+                  <AccordionTrigger className="py-2 text-sm">Right-click any task</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground pb-3">
+                    Edit its text, or mark it as important/unimportant. Backlog group titles can also be renamed by right-clicking them.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="schedule" className="border-b-0">
+                  <AccordionTrigger className="py-2 text-sm">Schedule tasks inline</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground pb-3">
+                    Write phrases like <span className="text-foreground">"due tomorrow"</span>, <span className="text-foreground">"this week"</span>, or on Fridays <span className="text-foreground">"on Monday"</span> / <span className="text-foreground">"next week"</span> and they'll land in the right bucket.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="important" className="border-b-0">
+                  <AccordionTrigger className="py-2 text-sm">Mark as IMPORTANT</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground pb-3">
+                    Add the word <span className="text-foreground">IMPORTANT</span> to a task and it'll appear <span className="font-bold text-foreground">bolded</span> in your list.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="people" className="border-b-0">
+                  <AccordionTrigger className="py-2 text-sm">People recognition</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground pb-3">
+                    Names you mention get a <span className="inline-flex items-center rounded-full border border-primary/60 bg-primary/5 px-1.5 py-0 text-[0.82em] font-medium text-primary mx-1 align-baseline">pill</span> border so it's easy to spot who's involved.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="voice" className="border-b-0">
+                  <AccordionTrigger className="py-2 text-sm">Voice input</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground pb-3">
+                    Tap the mic and brain-dump your tasks naturally; they'll be parsed and grouped for you.
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </PopoverContent>
+          </Popover>
         </CardTitle>
         <div className="flex items-center gap-2">
           <button
