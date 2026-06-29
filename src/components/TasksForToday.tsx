@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices,
 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -41,6 +41,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [diceOpen, setDiceOpen] = useState(false);
+  const [editingGroupTitle, setEditingGroupTitle] = useState<string | null>(null); // key = `${bucket}:${gi}`
+  const [editingGroupText, setEditingGroupText] = useState("");
+  const [groupTitleOverrides, setGroupTitleOverrides] = useState<Record<string, string>>({});
   const [randomTask, setRandomTask] = useState<TaskRow | null>(null);
 
   const rollRandomTask = () => {
@@ -281,14 +284,51 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           </p>
         ) : bucket === "backlog" ? (
           <div className="space-y-3">
-            {groups!.map((g, gi) => (
-              <div key={gi} className="pl-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
-                  {g.title}
-                </p>
-                <div className="space-y-1.5">{g.rows.map(renderCheckboxRow)}</div>
-              </div>
-            ))}
+            {groups!.map((g, gi) => {
+              const titleKey = `${bucket}:${gi}`;
+              const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
+              const isEditingTitle = editingGroupTitle === titleKey;
+              return (
+                <div key={gi} className="pl-1">
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <div>
+                        {isEditingTitle ? (
+                          <input
+                            autoFocus
+                            value={editingGroupText}
+                            onChange={(e) => setEditingGroupText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
+                                setEditingGroupTitle(null);
+                              } else if (e.key === "Escape") {
+                                setEditingGroupTitle(null);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
+                              setEditingGroupTitle(null);
+                            }}
+                            className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 bg-transparent border-b border-muted-foreground/40 outline-none w-full"
+                          />
+                        ) : (
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 cursor-default">
+                            {displayTitle}
+                          </p>
+                        )}
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => { setEditingGroupText(displayTitle); setEditingGroupTitle(titleKey); }}>
+                        Rename group
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                  <div className="space-y-1.5">{g.rows.map(renderCheckboxRow)}</div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -371,42 +411,47 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" /> Tasks
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Task tips"
-                className="text-muted-foreground/70 hover:text-foreground transition-colors"
-              >
-                <Info className="h-4 w-4" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-80 text-sm space-y-3">
-              <p className="font-semibold text-foreground">Tips for managing tasks</p>
-              <ul className="list-disc pl-5 space-y-2 text-muted-foreground marker:text-muted-foreground/60">
-                <li>
-                  <span className="font-medium text-foreground">Schedule tasks inline</span> — write phrases like
-                  <span className="text-foreground"> "due tomorrow"</span>,
-                  <span className="text-foreground"> "this week"</span>, or on Fridays
-                  <span className="text-foreground"> "on Monday"</span> /
-                  <span className="text-foreground"> "next week"</span> and they'll land in the right bucket.
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Mark as IMPORTANT</span> — add the word
-                  <span className="text-foreground"> IMPORTANT</span> to a task and it'll appear
-                  <span className="font-bold text-foreground"> bolded</span> in your list.
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">People recognition</span> — names you mention get a
-                  <span className="inline-flex items-center rounded-full border border-primary/60 bg-primary/5 px-1.5 py-0 text-[0.82em] font-medium text-primary mx-1 align-baseline">pill</span>
-                  border so it's easy to spot who's involved.
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Voice input</span> — tap the mic and brain‑dump your tasks naturally; they'll be parsed and grouped for you.
-                </li>
-              </ul>
-            </PopoverContent>
-          </Popover>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Task tips"
+                  className="text-muted-foreground/70 hover:text-foreground transition-colors"
+                >
+                  <Info className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent align="start" className="w-80 text-sm space-y-3 p-4" side="bottom">
+                <p className="font-semibold text-foreground">Tips for managing tasks</p>
+                <ul className="list-disc pl-5 space-y-2 text-muted-foreground marker:text-muted-foreground/60">
+                  <li>
+                    <span className="font-medium text-foreground">Right-click any task</span> — edit its text, or mark it as important/unimportant. Backlog group titles can also be renamed by right-clicking them.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">Schedule tasks inline</span> — write phrases like
+                    <span className="text-foreground"> "due tomorrow"</span>,
+                    <span className="text-foreground"> "this week"</span>, or on Fridays
+                    <span className="text-foreground"> "on Monday"</span> /
+                    <span className="text-foreground"> "next week"</span> and they'll land in the right bucket.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">Mark as IMPORTANT</span> — add the word
+                    <span className="text-foreground"> IMPORTANT</span> to a task and it'll appear
+                    <span className="font-bold text-foreground"> bolded</span> in your list.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">People recognition</span> — names you mention get a
+                    <span className="inline-flex items-center rounded-full border border-primary/60 bg-primary/5 px-1.5 py-0 text-[0.82em] font-medium text-primary mx-1 align-baseline">pill</span>
+                    border so it's easy to spot who's involved.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">Voice input</span> — tap the mic and brain‑dump your tasks naturally; they'll be parsed and grouped for you.
+                  </li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </CardTitle>
         <div className="flex items-center gap-2">
           <button
