@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices,
 } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
