@@ -50,6 +50,10 @@ NOT DUPLICATES — do NOT cluster these:
 
 CRITICAL RULE: Tasks that follow the same template or phrasing pattern (e.g., "Update [document] with [person]'s comments") are NOT duplicates unless [document] is identical. The specific noun or deliverable is what matters, not the surrounding words.
 
+NEVER cluster tasks just because they share a prefix, marker, or formatting like "!!", "IMPORTANT", "TODO", bullet style, or capitalization. Ignore those markers entirely when comparing — only the underlying action + deliverable matter. A shared importance flag is NOT evidence of duplication.
+
+If you cannot point to a specific shared deliverable (same document name, same feature, same message to the same person about the same topic), return an empty clusters array.
+
 You MUST respond by calling the report_duplicates tool. Rules:
 - Only return clusters of 2 or more task ids.
 - Each id must come from the input. Do not invent ids.
