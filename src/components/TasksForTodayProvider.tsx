@@ -276,7 +276,13 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke("ai-detect-duplicate-tasks", {
-          body: { tasks: candidates.map((r) => ({ id: r.id, task_text: r.task_text })) },
+          body: {
+            tasks: candidates.map((r) => ({
+              id: r.id,
+              // Strip the "!!" importance prefix so the detector doesn't cluster by importance.
+              task_text: r.task_text.replace(/^\s*!!\s*/, ""),
+            })),
+          },
         });
         if (cancelled) return;
         if (error) throw error;
