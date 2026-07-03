@@ -31,6 +31,30 @@ Here is my weekly status update:
 Best regards`,
   },
   {
+    id: "default-grouped",
+    name: "Standard — Grouped by Backlog Projects",
+    description: "Classic weekly status update where completed tasks and carry-over are organized by the project groups from your backlog.",
+    template: `Subject: Weekly Status Update - [Week Range]
+
+Hi team,
+
+Here is my weekly status update:
+
+## Highlights
+[Key accomplishments this week]
+
+## Challenges / Blockers
+[Any issues encountered]
+
+## Completed Tasks
+[Detailed list of completed work — grouped by project/theme from the backlog]
+
+## Carry-over / Next Week
+[Tasks remaining for next week — grouped by the same project/theme headings]
+
+Best regards`,
+  },
+  {
     id: "by-customer",
     name: "Group by Customer",
     description: "Organize completed work, next-week plans, and blockers per customer.",
