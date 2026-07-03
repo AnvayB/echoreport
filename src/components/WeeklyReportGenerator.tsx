@@ -68,13 +68,13 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
 
     const [entriesRes, completedTasksRes, thisWeekPendingRes, nextWeekPendingRes, backlogPendingRes] = await Promise.all([
       supabase.from("daily_entries").select("*").eq("user_id", user.id).in("entry_date", dates).order("entry_date"),
-      supabase.from("daily_tasks").select("task_date, section, task_text, completed").eq("user_id", user.id).in("task_date", dates).eq("completed", true).order("task_date"),
+      supabase.from("daily_tasks").select("id, task_date, section, task_text, completed").eq("user_id", user.id).in("task_date", dates).eq("completed", true).order("task_date"),
       // Tasks scheduled for THIS week that weren't completed (slipped)
-      supabase.from("daily_tasks").select("task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).gte("task_date", weekStartKey).lte("task_date", weekEndKey).order("task_date"),
+      supabase.from("daily_tasks").select("id, task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).gte("task_date", weekStartKey).lte("task_date", weekEndKey).order("task_date"),
       // Tasks explicitly scheduled for NEXT week (intentional carry-over)
-      supabase.from("daily_tasks").select("task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).gt("task_date", weekEndKey).lte("task_date", nextWeekEndKey).order("task_date"),
+      supabase.from("daily_tasks").select("id, task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).gt("task_date", weekEndKey).lte("task_date", nextWeekEndKey).order("task_date"),
       // Older backlog items (AI will decide what's relevant)
-      supabase.from("daily_tasks").select("task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).lt("task_date", weekStartKey).order("task_date", { ascending: false }).limit(30),
+      supabase.from("daily_tasks").select("id, task_date, section, task_text, completed").eq("user_id", user.id).eq("completed", false).lt("task_date", weekStartKey).order("task_date", { ascending: false }).limit(30),
     ]);
 
     const completedTasks = dedupeTaskRows(completedTasksRes.data || []);
@@ -84,6 +84,28 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
 
     // For backward-compat with the edge function, pass a flat tasks array too
     const allTasks = dedupeTaskRows([...completedTasks, ...thisWeekPending, ...nextWeekPending, ...backlogPending]);
+
+    // Ask the grouping function to organize the union of completed + carry-over
+    // (slipped + planned-next-week + backlog) into the same project buckets shown
+    // in the Today/Backlog UI, so the weekly report reuses those groupings.
+    const groupInput = dedupeTaskRows([
+      ...completedTasks,
+      ...thisWeekPending,
+      ...nextWeekPending,
+      ...backlogPending,
+    ])
+      .filter((t: any) => t.id && t.task_text)
+      .map((t: any) => ({ id: t.id as string, task_text: t.task_text as string }));
+
+    let taskGroups: Array<{ title: string; task_ids: string[] }> = [];
+    try {
+      const { data: groupData } = await supabase.functions.invoke("ai-group-tasks", {
+        body: { tasks: groupInput },
+      });
+      if (groupData && Array.isArray(groupData.groups)) taskGroups = groupData.groups;
+    } catch (e) {
+      console.warn("ai-group-tasks failed, continuing without groupings", e);
+    }
 
     const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
@@ -95,6 +117,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
           thisWeekPending,
           nextWeekPending,
           backlogPending,
+          taskGroups,
           emailTemplate: selectedTemplate?.template || "",
           weekLabel: formatWeekLabel(currentWeek),
         },

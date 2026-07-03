@@ -15,17 +15,23 @@ interface DailyEntry {
 }
 
 interface DailyTask {
+  id?: string;
   task_date: string;
   section: string;
   task_text: string;
   completed: boolean;
 }
 
+interface TaskGroup {
+  title: string;
+  task_ids: string[];
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { entries, tasks, thisWeekPending, nextWeekPending, backlogPending, emailTemplate, weekLabel } = await req.json();
+    const { entries, tasks, thisWeekPending, nextWeekPending, backlogPending, taskGroups, emailTemplate, weekLabel } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
@@ -40,10 +46,40 @@ serve(async (req) => {
     const completedTasks = taskList.filter((t) => t.completed);
     const blockerTasks = taskList.filter((t) => !t.completed && t.section === "blocker");
 
+    // Build id -> group title map from the shared backlog groupings
+    const groupTitleById = new Map<string, string>();
+    const groupList: TaskGroup[] = Array.isArray(taskGroups) ? taskGroups : [];
+    for (const g of groupList) {
+      for (const id of g.task_ids || []) groupTitleById.set(id, g.title);
+    }
+    const groupOrder = groupList.map((g) => g.title);
+
     const fmtTaskList = (rows: DailyTask[]) =>
       rows.length === 0
         ? "  (none)"
         : rows.map((r) => `  - [${r.task_date}] ${r.task_text}`).join("\n");
+
+    const fmtGrouped = (rows: DailyTask[]) => {
+      if (rows.length === 0) return "  (none)";
+      if (groupTitleById.size === 0) return fmtTaskList(rows);
+      const buckets = new Map<string, DailyTask[]>();
+      for (const r of rows) {
+        const title = (r.id && groupTitleById.get(r.id)) || "Other";
+        if (!buckets.has(title)) buckets.set(title, []);
+        buckets.get(title)!.push(r);
+      }
+      const titles = [
+        ...groupOrder.filter((t) => buckets.has(t)),
+        ...[...buckets.keys()].filter((t) => !groupOrder.includes(t)),
+      ];
+      return titles
+        .map(
+          (title) =>
+            `  [Group: ${title}]\n` +
+            buckets.get(title)!.map((r) => `    - [${r.task_date}] ${r.task_text}`).join("\n")
+        )
+        .join("\n");
+    };
 
     // Use tiered pending data if provided (new clients), otherwise fall back to flat list
     const slippedThisWeek: DailyTask[] = Array.isArray(thisWeekPending)
@@ -57,15 +93,19 @@ serve(async (req) => {
       : [];
 
     const taskSummary = `\n\n## Authoritative task state for the week\n` +
-      `### Completed (checked off this week)\n${fmtTaskList(completedTasks)}\n\n` +
-      `### Slipped this week (scheduled for this week, not completed)\n${fmtTaskList(slippedThisWeek)}\n\n` +
-      `### Explicitly planned for next week\n${fmtTaskList(plannedNextWeek)}\n\n` +
-      `### Older backlog (select only if directly relevant to this week's work themes)\n${fmtTaskList(olderBacklog)}\n\n` +
+      `### Completed (checked off this week) — pre-grouped by project/theme\n${fmtGrouped(completedTasks)}\n\n` +
+      `### Slipped this week (scheduled for this week, not completed) — pre-grouped\n${fmtGrouped(slippedThisWeek)}\n\n` +
+      `### Explicitly planned for next week — pre-grouped\n${fmtGrouped(plannedNextWeek)}\n\n` +
+      `### Older backlog (select only if directly relevant) — pre-grouped\n${fmtGrouped(olderBacklog)}\n\n` +
       `### Open Blockers\n${fmtTaskList(blockerTasks)}\n`;
 
     const templateInstruction = emailTemplate
       ? `Follow this email format/template as closely as possible:\n\n${emailTemplate}`
       : "Write a professional weekly status update email.";
+
+    const groupingRule = groupTitleById.size > 0
+      ? `- Inside the "Completed Tasks" and "Carry-over / Next Week" sections, organize tasks under the "[Group: ...]" project/theme headings supplied in the authoritative task state. Render each group as a "**Group Title**" subheading followed by that group's bullets. Preserve the group titles verbatim. Do not invent new groups or merge groups. Keep the overall email structure from the template (highlights, lowlights/challenges, completed, carry-over, blockers) — the groupings only apply WITHIN the completed and carry-over sections.`
+      : `- Present completed tasks and carry-over as flat bullet lists.`;
 
     const systemPrompt = `You are a professional assistant that writes weekly status update emails. ${templateInstruction}
 
@@ -73,6 +113,7 @@ Replace any placeholders with actual content. Use the AUTHORITATIVE task state a
 
 Rules:
 - "Completed Tasks" / accomplishments must come only from the checked-off task list (enrich with entry narrative where helpful).
+${groupingRule}
 - "Carry-over / Next Week" selection rules — be SELECTIVE, not exhaustive:
   1. Always include tasks from "Slipped this week" — these are things you intended to do but didn't finish.
   2. Always include tasks from "Explicitly planned for next week" — these are intentional.
