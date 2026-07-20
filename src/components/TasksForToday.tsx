@@ -179,7 +179,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               if (!age) return null;
               const days = daysSince(row.created_at) ?? 0;
               const tone =
-                days < 2
+                days <= 3
                   ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
                   : days >= 60
                     ? "bg-[#5a1a1a]/15 text-[#7a1f1f] dark:text-[#c76b6b] border-[#7a1f1f]/40"
