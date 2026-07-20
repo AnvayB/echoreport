@@ -181,13 +181,15 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               const tone =
                 days < 2
                   ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
-                  : days >= 28
-                    ? "bg-destructive/15 text-destructive border-destructive/40"
-                    : days >= 14
-                      ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
-                      : days >= 7
-                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                        : "bg-muted/50 text-muted-foreground border-border";
+                  : days >= 60
+                    ? "bg-[#5a1a1a]/15 text-[#7a1f1f] dark:text-[#c76b6b] border-[#7a1f1f]/40"
+                    : days >= 28
+                      ? "bg-destructive/15 text-destructive border-destructive/40"
+                      : days >= 14
+                        ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
+                        : days >= 7
+                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                          : "bg-muted/50 text-muted-foreground border-border";
               return (
                 <span
                   title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
