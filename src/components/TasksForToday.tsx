@@ -26,7 +26,7 @@ interface TasksForTodayProps {
 const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const {
     loading, loaded,
-    completedYesterday, completedToday, pending, blockers,
+    completedYesterday, completedYesterdayDate, completedToday, pending, blockers,
     pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
@@ -345,11 +345,26 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   // ─── Completed Yesterday slot ─────────────────────────────────
   if (section === "completedYesterday") {
     if (!isViewingToday || !loaded || completedYesterday.length === 0) return null;
+    const label = (() => {
+      if (!completedYesterdayDate) return "Completed Yesterday";
+      // Parse YYYY-MM-DD as a local date (avoid UTC shift).
+      const [y, m, d] = completedYesterdayDate.split("-").map(Number);
+      const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+      const yest = new Date();
+      yest.setDate(yest.getDate() - 1);
+      const isLiteralYesterday =
+        dt.getFullYear() === yest.getFullYear() &&
+        dt.getMonth() === yest.getMonth() &&
+        dt.getDate() === yest.getDate();
+      if (isLiteralYesterday) return "Completed Yesterday";
+      const weekday = dt.toLocaleDateString(undefined, { weekday: "long" });
+      return `Completed ${weekday}`;
+    })();
     return (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <CircleCheckBig className="h-4 w-4" /> Completed Yesterday
+            <CircleCheckBig className="h-4 w-4" /> {label}
           </CardTitle>
         </CardHeader>
         <CardContent>
