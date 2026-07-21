@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { getPreviousWorkday, formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
+import { formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText, stripTaskFiller } from "@/lib/taskUtils";
 import { clearVerdicts } from "@/lib/nameVerification";
 import { resolveWhenHint } from "@/lib/scheduleHints";
@@ -637,6 +637,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         loading,
         loaded,
         completedYesterday,
+        completedYesterdayDate,
         completedToday,
         pending,
         blockers,

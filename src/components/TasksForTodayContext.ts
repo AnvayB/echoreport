@@ -36,6 +36,7 @@ export interface TasksForTodayContextValue {
   loading: boolean;
   loaded: boolean;
   completedYesterday: TaskRow[];
+  completedYesterdayDate: string | null;
   completedToday: TaskRow[];
   pending: TaskRow[];
   blockers: TaskRow[];
