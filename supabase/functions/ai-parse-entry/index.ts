@@ -33,7 +33,7 @@ serve(async (req) => {
 ${dateContext}
 
 FIELD DEFINITIONS — read carefully:
-- "accomplishments": Things ALREADY DONE or completed today (past tense). Bullet list (lines starting with "- "). Keep the user's wording as-is.
+- "accomplishments": Things ALREADY DONE or completed today (past tense). Bullet list (lines starting with "- "). Rewrite each item professionally (see rules below).
 - "pending_tasks": Things NOT YET DONE — planned for tomorrow or later, still in progress, or left over. Bullet list (lines starting with "- "). Rewrite as imperative action items (see rules below).
 - "blockers": Challenges, issues, or things blocking progress — regardless of tense. Bullet list. Keep user's wording.
 - "notes": Anything else — follow-ups, random thoughts, reminders, FYIs. Bullet list.
@@ -51,9 +51,11 @@ For each pending task's "when":
 Rules:
 - Use bullet points (lines starting with "- ") within the four text fields.
 - If a category has nothing, return an empty string "" (or empty array for pending_task_schedule).
-- For "accomplishments", "blockers", and "notes": keep the user's wording as much as possible.
+- For "blockers" and "notes": keep the user's wording as much as possible.
+- COMPLETED-ITEM REWRITE for accomplishments only: Rewrite each item into a concise, professional past-tense statement suitable for a status report. Start with a strong past-tense verb (e.g., "Completed", "Delivered", "Fixed", "Updated", "Investigated", "Reviewed", "Coordinated"). Strip filler ("basically", "just", "kind of", "I", "we", "today", "finally", "was able to", "managed to"). Capitalize the first letter, fix obvious typos and casing (proper nouns, acronyms like SIP/FAE/USA). Preserve all specifics — names, tools, tickets, projects, numbers. Do NOT invent scope or details not in the user's text. Keep each item to one crisp sentence. Example: "i finally fixed the missing cases for a few FAEs like souhila akash van dung" → "Fixed missing cases for several FAEs (Souhila, Akash, Van Dung)".
 - ACTION-ITEM REWRITE for pending tasks only: Rewrite each pending item as a concise, imperative action starting with a verb. Strip filler like "need to", "have to", "got to", "should", "want to", "going to", "I'll", "I need to". Capitalize the first letter. Fix obvious typos. Preserve all specifics (names, tools, context). Example: "need to explore Smartsheet too understand AE Assignments" → "Explore Smartsheet to understand AE Assignments".
 - IMPORTANCE MARKER: If a task is marked with the word "IMPORTANT" (any case) by the user, prefix that task's text with "!! " (two exclamation marks and a space) in BOTH "pending_tasks" bullets and "pending_task_schedule" entries, and remove the literal word "IMPORTANT" from the text. Do not add this prefix unless the user explicitly marked the task important.`;
+
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
