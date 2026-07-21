@@ -137,17 +137,22 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const load = async () => {
     if (!user) return;
     setLoading(true);
-    const prevKey = formatDateKey(getPreviousWorkday(today));
 
-    const [completedRes, pendingRes, blockerRes, completedTodayRes] = await Promise.all([
-      supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("task_date", prevKey).eq("completed", true),
+    const [completedPriorRes, pendingRes, blockerRes, completedTodayRes] = await Promise.all([
+      // Recent completions before today; we'll pick the most recent date that has any.
+      supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", true).lt("task_date", todayKey).order("task_date", { ascending: false }).limit(50),
       // Pending: anything not completed up through end of this week (overdue + today + tomorrow + this week)
       supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", false).in("section", ["pending", "pending:manual"]).lte("task_date", weekEndKey).order("task_date", { ascending: true }),
       supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("completed", false).eq("section", "blocker").lte("task_date", weekEndKey).order("task_date", { ascending: true }),
       supabase.from("daily_tasks").select("*").eq("user_id", user.id).eq("task_date", todayKey).eq("completed", true),
     ]);
 
-    const completedResult = mergeDuplicateTaskRows(completedRes.data ?? []);
+    // Narrow prior completions to the single most recent date that had completions.
+    const priorRows = completedPriorRes.data ?? [];
+    const mostRecentDate = priorRows[0]?.task_date ?? null;
+    const priorForMostRecent = mostRecentDate ? priorRows.filter((r) => r.task_date === mostRecentDate) : [];
+
+    const completedResult = mergeDuplicateTaskRows(priorForMostRecent);
     const pendingResult = mergeDuplicateTaskRows(pendingRes.data ?? []);
     const blockerResult = mergeDuplicateTaskRows(blockerRes.data ?? []);
     const completedTodayResult = mergeDuplicateTaskRows(completedTodayRes.data ?? []);
@@ -164,6 +169,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
 
     setCompletedYesterday(completedResult.rows);
+    setCompletedYesterdayDate(mostRecentDate);
     setCompletedToday(completedTodayResult.rows);
     setPending(pendingResult.rows);
     setBlockers(blockerResult.rows);
