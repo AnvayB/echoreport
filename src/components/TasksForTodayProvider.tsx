@@ -98,6 +98,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const isViewingToday = !selectedDate || isSameDay(selectedDate, new Date());
 
   const [completedYesterday, setCompletedYesterday] = useState<TaskRow[]>([]);
+  const [completedYesterdayDate, setCompletedYesterdayDate] = useState<string | null>(null);
   const [completedToday, setCompletedToday] = useState<TaskRow[]>([]);
   const [pending, setPending] = useState<TaskRow[]>([]);
   const [blockers, setBlockers] = useState<TaskRow[]>([]);
