@@ -276,6 +276,11 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         ) : (
           <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
             {bucketLabels[bucket]}
+            {hasItems && (
+              <span className="text-xs font-normal text-muted-foreground">
+                ({groups!.reduce((n, g) => n + g.rows.length, 0)})
+              </span>
+            )}
             {bucket === "today" && grouping && (
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
             )}
