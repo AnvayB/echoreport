@@ -323,6 +323,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                         ) : (
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 cursor-default">
                             {displayTitle}
+                            <span className="ml-1.5 normal-case tracking-normal text-muted-foreground/70">
+                              ({g.rows.length})
+                            </span>
                           </p>
                         )}
                       </div>
