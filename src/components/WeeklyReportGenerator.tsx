@@ -55,10 +55,18 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     setLoading(true);
 
     const weekdays = getWeekdays(currentWeek);
-    const dates = weekdays.map(formatDateKey);
+    // Include the prior Saturday and Sunday so weekend work rolls into this week's report.
+    const mondayDate = weekdays[0];
+    const priorSaturday = new Date(mondayDate);
+    priorSaturday.setDate(priorSaturday.getDate() - 2);
+    const priorSunday = new Date(mondayDate);
+    priorSunday.setDate(priorSunday.getDate() - 1);
+    const scopeDates = [priorSaturday, priorSunday, ...weekdays];
+    const dates = scopeDates.map(formatDateKey);
     const weekEndKey = getWeekEndKey(currentWeek);
 
-    const weekStartKey = getWeekStartKey(currentWeek);
+    // Start the week's query range at the prior Saturday so weekend tasks are included.
+    const weekStartKey = formatDateKey(priorSaturday);
     // Next workweek: Mon–Fri after weekEndKey
     const nextWeekStart = new Date(currentWeek);
     nextWeekStart.setDate(nextWeekStart.getDate() + 7 - nextWeekStart.getDay() + 1);
