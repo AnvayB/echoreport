@@ -7,6 +7,7 @@ export interface TaskRow {
   section: string;
   task_date: string;
   created_at?: string;
+  group_title?: string | null;
 }
 
 export interface TaskGroup {
