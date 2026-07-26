@@ -183,85 +183,91 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, todayKey]);
 
-  const pendingIdsKey = pending.map((r) => r.id).sort().join("|");
+  const hydrateGroupsFromRows = (rows: TaskRow[]): TaskGroup[] => {
+    const map = new Map<string, TaskRow[]>();
+    rows.forEach((r) => {
+      const title = r.group_title || "Other";
+      if (!map.has(title)) map.set(title, []);
+      map.get(title)!.push(r);
+    });
+    return [...map.entries()].map(([title, groupedRows]) => ({ title, rows: groupedRows }));
+  };
+
+  // Signature that changes when pending ids OR their group_title values change.
+  const pendingGroupSignature = pending
+    .map((r) => `${r.id}:${r.group_title ?? ""}`)
+    .sort()
+    .join("|");
+
   useEffect(() => {
     if (pending.length === 0) {
       setPendingGroups(null);
       return;
     }
-    if (pending.length <= 2) {
+    if (pending.length <= 2 && pending.every((r) => !r.group_title)) {
       setPendingGroups([{ title: "General", rows: pending }]);
       return;
     }
-    // Optimistic in-place filter when only removals happened.
-    const currentIds = new Set(pending.map((r) => r.id));
-    setPendingGroups((prev) => {
-      if (!prev) return prev;
-      const groupedIds = new Set(prev.flatMap((g) => g.rows.map((r) => r.id)));
-      const allCovered = [...currentIds].every((id) => groupedIds.has(id));
-      if (!allCovered) return prev;
-      const filtered = prev
-        .map((g) => ({ ...g, rows: g.rows.filter((r) => currentIds.has(r.id)) }))
-        .filter((g) => g.rows.length > 0);
-      return filtered;
-    });
 
-    const existingGroupedIds = new Set(
-      (pendingGroups ?? []).flatMap((g) => g.rows.map((r) => r.id))
-    );
-    const hasNewIds = pending.some((r) => !existingGroupedIds.has(r.id));
-    if (!hasNewIds) return;
+    const ungrouped = pending.filter((r) => !r.group_title);
+
+    // Everything is already categorized — hydrate from stored group_title, no AI call.
+    if (ungrouped.length === 0) {
+      setPendingGroups(hydrateGroupsFromRows(pending));
+      return;
+    }
 
     let cancelled = false;
     setGrouping(true);
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
-          body: { tasks: pending.map((r) => ({ id: r.id, task_text: r.task_text })) },
+          body: { tasks: ungrouped.map((r) => ({ id: r.id, task_text: r.task_text })) },
         });
         if (cancelled) return;
         if (error) throw error;
         const rawGroups: Array<{ title: string; task_ids: string[] }> = Array.isArray(data?.groups) ? data.groups : [];
         const unavailable = data?.unavailable === true || rawGroups.length === 0;
 
-        // If AI is unavailable, keep prior group titles and locally group any new tasks by topic.
+        // Fall back to a local topic guess for the new tasks; keep existing groupings intact.
         if (unavailable) {
-          setPendingGroups((prev) => {
-            const byId = new Map(pending.map((r) => [r.id, r]));
-            const used = new Set<string>();
-            const groups: TaskGroup[] = [];
-            (prev ?? []).forEach((g) => {
-              const rows = g.rows
-                .map((r) => byId.get(r.id))
-                .filter((r): r is TaskRow => Boolean(r) && !used.has(r!.id));
-              rows.forEach((r) => used.add(r.id));
-              if (rows.length > 0) groups.push({ title: g.title, rows });
-            });
-            const leftover = pending.filter((r) => !used.has(r.id));
-            if (leftover.length > 0) groups.push(...buildLocalTaskGroups(leftover));
-            return groups.length > 0 ? groups : buildLocalTaskGroups(pending);
-          });
+          const localGroups = buildLocalTaskGroups(ungrouped);
+          const assignments = new Map<string, string>();
+          localGroups.forEach((g) => g.rows.forEach((r) => assignments.set(r.id, g.title)));
+          await persistGroupAssignments(assignments);
+          setPending((list) =>
+            list.map((r) => (assignments.has(r.id) ? { ...r, group_title: assignments.get(r.id)! } : r))
+          );
           return;
         }
 
-        const byId = new Map(pending.map((r) => [r.id, r]));
-        const used = new Set<string>();
-        const groups: TaskGroup[] = [];
+        const assignments = new Map<string, string>();
         rawGroups.forEach((g) => {
-          const rows = (g.task_ids || [])
-            .map((id) => byId.get(id))
-            .filter((r): r is TaskRow => Boolean(r) && !used.has(r!.id));
-          rows.forEach((r) => used.add(r.id));
-          if (rows.length > 0) groups.push({ title: g.title, rows });
+          (g.task_ids || []).forEach((id) => {
+            if (!assignments.has(id)) assignments.set(id, g.title);
+          });
         });
-        const leftover = pending.filter((r) => !used.has(r.id));
-        if (leftover.length > 0) groups.push({ title: "Other", rows: leftover });
-        setPendingGroups(groups.length > 0 ? groups : [{ title: "General", rows: pending }]);
+        // Anything the AI didn't place goes to "Other" so we don't re-ask about it later.
+        ungrouped.forEach((r) => {
+          if (!assignments.has(r.id)) assignments.set(r.id, "Other");
+        });
+
+        await persistGroupAssignments(assignments);
+        setPending((list) =>
+          list.map((r) => (assignments.has(r.id) ? { ...r, group_title: assignments.get(r.id)! } : r))
+        );
       } catch (e) {
         console.error("Failed to group tasks:", e);
-        // Preserve any existing groupings; locally group if we have none yet.
         if (!cancelled) {
-          setPendingGroups((prev) => prev && prev.length > 0 ? prev : buildLocalTaskGroups(pending));
+          // Preserve existing groups; slot new tasks into a local guess.
+          setPendingGroups((prev) => {
+            const existing = prev ?? [];
+            const covered = new Set(existing.flatMap((g) => g.rows.map((r) => r.id)));
+            const leftover = pending.filter((r) => !covered.has(r.id));
+            return leftover.length > 0
+              ? [...existing, ...buildLocalTaskGroups(leftover)]
+              : existing.length > 0 ? existing : buildLocalTaskGroups(pending);
+          });
         }
       } finally {
         if (!cancelled) setGrouping(false);
@@ -269,7 +275,22 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingIdsKey]);
+  }, [pendingGroupSignature]);
+
+  const persistGroupAssignments = async (assignments: Map<string, string>) => {
+    if (assignments.size === 0) return;
+    const byTitle = new Map<string, string[]>();
+    assignments.forEach((title, id) => {
+      if (!byTitle.has(title)) byTitle.set(title, []);
+      byTitle.get(title)!.push(id);
+    });
+    await Promise.all(
+      [...byTitle.entries()].map(([title, ids]) =>
+        supabase.from("daily_tasks").update({ group_title: title }).in("id", ids)
+      )
+    );
+  };
+
 
   // Detect semantic duplicates across pending + blockers via AI.
   const detectKey = [...pending, ...blockers].map((r) => r.id).sort().join("|");

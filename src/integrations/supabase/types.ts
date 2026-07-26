@@ -54,6 +54,7 @@ export type Database = {
         Row: {
           completed: boolean
           created_at: string
+          group_title: string | null
           id: string
           section: string
           task_date: string
@@ -63,6 +64,7 @@ export type Database = {
         Insert: {
           completed?: boolean
           created_at?: string
+          group_title?: string | null
           id?: string
           section: string
           task_date: string
@@ -72,6 +74,7 @@ export type Database = {
         Update: {
           completed?: boolean
           created_at?: string
+          group_title?: string | null
           id?: string
           section?: string
           task_date?: string
