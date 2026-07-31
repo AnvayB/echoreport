@@ -12,8 +12,21 @@ import {
 } from "@/components/ui/dialog";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
 import { dedupeTaskRows } from "@/lib/taskUtils";
-import { Loader2, FileText, Copy, Download } from "lucide-react";
+import { Loader2, FileText, Copy, Download, Mail } from "lucide-react";
 import { toast } from "sonner";
+
+// Strip markdown remnants (bold/italic markers, heading hashes, code fences)
+// so the draft can be pasted straight into Outlook and styled there.
+const stripMarkdown = (text: string) =>
+  text
+    .replace(/```[a-z]*\n?/gi, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*\*(.+?)\*\*\*/g, "$1")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|[\s(])_(?!_)(.+?)_(?=[\s.,;:)!?]|$)/g, "$1$2")
+    .replace(/(^|[\s(])\*(?!\s)(.+?)\*(?=[\s.,;:)!?]|$)/g, "$1$2")
+    .replace(/^\s*[-*]\s+/gm, "- ")
+    .trim();
 
 interface WeeklyReportGeneratorProps {
   currentWeek: Date;
@@ -131,7 +144,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         },
       });
       if (error) throw error;
-      setDraft(data.report);
+      setDraft(stripMarkdown(data.report || ""));
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate report");
@@ -161,6 +174,22 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success("Downloaded");
+  };
+
+  const openInOutlook = () => {
+    const lines = draft.split("\n");
+    const subjectIdx = lines.findIndex((l) => /^\s*subject\s*:/i.test(l));
+    const subject =
+      subjectIdx >= 0
+        ? lines[subjectIdx].replace(/^\s*subject\s*:\s*/i, "").trim()
+        : `Weekly Report — ${formatWeekLabel(currentWeek)}`;
+    const body = (subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines).join("\n").trim();
+    const url =
+      "https://outlook.office.com/mail/deeplink/compose?subject=" +
+      encodeURIComponent(subject) +
+      "&body=" +
+      encodeURIComponent(body);
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -215,6 +244,9 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
             <div className="flex flex-wrap gap-2">
               <Button onClick={downloadMarkdown} variant="outline" size="sm" disabled={!draft || loading}>
                 <Download className="mr-2 h-4 w-4" /> Download .md
+              </Button>
+              <Button onClick={openInOutlook} variant="outline" size="sm" disabled={!draft || loading}>
+                <Mail className="mr-2 h-4 w-4" /> Open in Outlook Web
               </Button>
               <Button onClick={generate} variant="ghost" size="sm" disabled={loading}>
                 Regenerate
