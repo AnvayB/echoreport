@@ -245,6 +245,9 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
               <Button onClick={downloadMarkdown} variant="outline" size="sm" disabled={!draft || loading}>
                 <Download className="mr-2 h-4 w-4" /> Download .md
               </Button>
+              <Button onClick={openInOutlook} variant="outline" size="sm" disabled={!draft || loading}>
+                <Mail className="mr-2 h-4 w-4" /> Open in Outlook Web
+              </Button>
               <Button onClick={generate} variant="ghost" size="sm" disabled={loading}>
                 Regenerate
               </Button>
