@@ -144,7 +144,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         },
       });
       if (error) throw error;
-      setDraft(data.report);
+      setDraft(stripMarkdown(data.report || ""));
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate report");
