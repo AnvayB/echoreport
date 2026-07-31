@@ -12,8 +12,21 @@ import {
 } from "@/components/ui/dialog";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
 import { dedupeTaskRows } from "@/lib/taskUtils";
-import { Loader2, FileText, Copy, Download } from "lucide-react";
+import { Loader2, FileText, Copy, Download, Mail } from "lucide-react";
 import { toast } from "sonner";
+
+// Strip markdown remnants (bold/italic markers, heading hashes, code fences)
+// so the draft can be pasted straight into Outlook and styled there.
+const stripMarkdown = (text: string) =>
+  text
+    .replace(/```[a-z]*\n?/gi, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*\*(.+?)\*\*\*/g, "$1")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|[\s(])_(?!_)(.+?)_(?=[\s.,;:)!?]|$)/g, "$1$2")
+    .replace(/(^|[\s(])\*(?!\s)(.+?)\*(?=[\s.,;:)!?]|$)/g, "$1$2")
+    .replace(/^\s*[-*]\s+/gm, "- ")
+    .trim();
 
 interface WeeklyReportGeneratorProps {
   currentWeek: Date;
