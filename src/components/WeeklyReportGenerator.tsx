@@ -176,6 +176,22 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     toast.success("Downloaded");
   };
 
+  const openInOutlook = () => {
+    const lines = draft.split("\n");
+    const subjectIdx = lines.findIndex((l) => /^\s*subject\s*:/i.test(l));
+    const subject =
+      subjectIdx >= 0
+        ? lines[subjectIdx].replace(/^\s*subject\s*:\s*/i, "").trim()
+        : `Weekly Report — ${formatWeekLabel(currentWeek)}`;
+    const body = (subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines).join("\n").trim();
+    const url =
+      "https://outlook.office.com/mail/deeplink/compose?subject=" +
+      encodeURIComponent(subject) +
+      "&body=" +
+      encodeURIComponent(body);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <>
       <Card>
