@@ -170,22 +170,10 @@ const ProjectHubPage = () => {
                 <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Workflow
               </Button>
 
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newRegionName}
-                  onChange={(e) => setNewRegionName(e.target.value)}
-                  placeholder="New region name"
-                  className="max-w-xs"
-                  onKeyDown={(e) => e.key === "Enter" && handleAddRegion()}
-                />
-                <Button size="sm" onClick={handleAddRegion} disabled={!newRegionName.trim()}>
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add Region
-                </Button>
-              </div>
 
               {regions.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  No regions yet — add one above to start tracking projects.
+                  No regions available.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
