@@ -131,6 +131,92 @@ export type Database = {
         }
         Relationships: []
       }
+      ph_projects: {
+        Row: {
+          airtable_project_id: string | null
+          created_at: string
+          id: string
+          project_name: string
+          region_id: string
+          status: Database["public"]["Enums"]["ph_project_status"]
+          status_notes: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          airtable_project_id?: string | null
+          created_at?: string
+          id?: string
+          project_name: string
+          region_id: string
+          status?: Database["public"]["Enums"]["ph_project_status"]
+          status_notes?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          airtable_project_id?: string | null
+          created_at?: string
+          id?: string
+          project_name?: string
+          region_id?: string
+          status?: Database["public"]["Enums"]["ph_project_status"]
+          status_notes?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ph_projects_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "ph_regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ph_regions: {
+        Row: {
+          created_at: string
+          id: string
+          manual_complete: number
+          manual_incomplete: number
+          manual_semi_complete: number
+          manual_total: number
+          name: string
+          notes: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manual_complete?: number
+          manual_incomplete?: number
+          manual_semi_complete?: number
+          manual_total?: number
+          name: string
+          notes?: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manual_complete?: number
+          manual_incomplete?: number
+          manual_semi_complete?: number
+          manual_total?: number
+          name?: string
+          notes?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       report_templates: {
         Row: {
           created_at: string
@@ -223,7 +309,11 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      ph_project_status:
+        | "not_started"
+        | "incomplete"
+        | "semi_complete"
+        | "complete"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -350,6 +440,13 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      ph_project_status: [
+        "not_started",
+        "incomplete",
+        "semi_complete",
+        "complete",
+      ],
+    },
   },
 } as const
