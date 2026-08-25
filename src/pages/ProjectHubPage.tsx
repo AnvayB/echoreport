@@ -21,6 +21,17 @@ type View = "flowchart" | "regions" | "region-detail";
 const REGION_COLUMNS =
   "id, name, notes, manual_complete, manual_semi_complete, manual_incomplete, manual_total";
 
+const SEED_REGIONS = [
+  "EMEA",
+  "China (SIP)",
+  "China (SIA)",
+  "Korea",
+  "USA (SIP)",
+  "USA (SIA)",
+  "Japan",
+];
+
+
 const ProjectHubPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -50,10 +61,30 @@ const ProjectHubPage = () => {
     if (regionError || projectError) {
       toast.error("Failed to load Project Hub data — the database tables may not be set up yet.");
     }
+
+    // First visit: seed the standard region set so the grid isn't empty.
+    if (!regionError && (regionData ?? []).length === 0) {
+      const { error: seedError } = await supabase.from("ph_regions").insert(
+        SEED_REGIONS.map((name, i) => ({ user_id: user.id, name, sort_order: i }))
+      );
+      if (!seedError) {
+        const { data: seeded } = await supabase
+          .from("ph_regions")
+          .select(REGION_COLUMNS)
+          .eq("user_id", user.id)
+          .order("sort_order", { ascending: true });
+        setRegions((seeded ?? []) as Region[]);
+        setProjects((projectData ?? []) as Project[]);
+        setLoading(false);
+        return;
+      }
+    }
+
     setRegions((regionData ?? []) as Region[]);
     setProjects((projectData ?? []) as Project[]);
     setLoading(false);
   };
+
 
   useEffect(() => {
     loadData();

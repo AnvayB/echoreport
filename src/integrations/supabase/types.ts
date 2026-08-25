@@ -309,7 +309,11 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      ph_project_status: "not_started" | "incomplete" | "semi_complete" | "complete"
+      ph_project_status:
+        | "not_started"
+        | "incomplete"
+        | "semi_complete"
+        | "complete"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -437,7 +441,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      ph_project_status: ["not_started", "incomplete", "semi_complete", "complete"],
+      ph_project_status: [
+        "not_started",
+        "incomplete",
+        "semi_complete",
+        "complete",
+      ],
     },
   },
 } as const

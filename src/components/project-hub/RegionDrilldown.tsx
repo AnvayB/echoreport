@@ -11,7 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, MessageSquare, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 import ProjectFormDialog, { type ProjectFormValues } from "./ProjectFormDialog";
 import RegionNotesDialog from "./RegionNotesDialog";
@@ -141,13 +141,14 @@ const RegionDrilldown = ({ region, projects, onBack, onProjectsChanged }: Region
             <TableHead>Project</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Status Notes</TableHead>
+            <TableHead className="w-[64px] text-center">Done</TableHead>
             <TableHead className="w-[96px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {filtered.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">
+              <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
                 No projects yet.
               </TableCell>
             </TableRow>
@@ -163,6 +164,14 @@ const RegionDrilldown = ({ region, projects, onBack, onProjectsChanged }: Region
                 <TableCell className="max-w-md text-sm text-muted-foreground">
                   {project.status_notes || "—"}
                 </TableCell>
+                <TableCell className="text-center">
+                  {project.status === "complete" ? (
+                    <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Circle className="mx-auto h-4 w-4 text-muted-foreground/50" />
+                  )}
+                </TableCell>
+
                 <TableCell>
                   <div className="flex items-center gap-1 justify-end">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(project)}>
