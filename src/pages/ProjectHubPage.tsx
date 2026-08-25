@@ -4,13 +4,13 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Loader2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, MessageSquare } from "lucide-react";
 import WorkflowFlowchart from "@/components/project-hub/WorkflowFlowchart";
 import RegionDrilldown, { type Region, type Project } from "@/components/project-hub/RegionDrilldown";
 import RegionNotesDialog from "@/components/project-hub/RegionNotesDialog";
@@ -41,7 +41,7 @@ const ProjectHubPage = () => {
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [notesRegion, setNotesRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
-  const [newRegionName, setNewRegionName] = useState("");
+  
 
   const loadData = async () => {
     if (!user) return;
@@ -105,19 +105,6 @@ const ProjectHubPage = () => {
     };
   }, emptyCounts());
 
-  const handleAddRegion = async () => {
-    if (!user || !newRegionName.trim()) return;
-    const { error } = await supabase
-      .from("ph_regions")
-      .insert({ user_id: user.id, name: newRegionName.trim(), sort_order: regions.length });
-    if (error) {
-      toast.error(`Failed to add region: ${error.message}`);
-      return;
-    }
-    setNewRegionName("");
-    toast.success("Region added");
-    loadData();
-  };
 
   const handleDeleteRegion = async (region: Region) => {
     const { error } = await supabase.from("ph_regions").delete().eq("id", region.id);
