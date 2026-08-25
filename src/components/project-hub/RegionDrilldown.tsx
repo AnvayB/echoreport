@@ -11,7 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, MessageSquare, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 import ProjectFormDialog, { type ProjectFormValues } from "./ProjectFormDialog";
 import RegionNotesDialog from "./RegionNotesDialog";
