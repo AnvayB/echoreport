@@ -46,3 +46,37 @@ export function tallyCounts(statuses: ProjectStatus[]): RegionCounts {
   }
   return counts;
 }
+
+export interface ManualRegionCounts {
+  manual_complete: number;
+  manual_semi_complete: number;
+  manual_incomplete: number;
+  manual_total: number;
+}
+
+export interface RegionWithSnapshot extends ManualRegionCounts {
+  id: string;
+  name: string;
+  notes: string;
+}
+
+/**
+ * Real ph_projects rows take priority once they exist; until then, fall back to the
+ * manual snapshot counts entered from outside tracking (spreadsheets, notes, etc.).
+ */
+export function effectiveCounts(
+  region: ManualRegionCounts,
+  projectStatuses: ProjectStatus[]
+): RegionCounts {
+  if (projectStatuses.length > 0) return tallyCounts(projectStatuses);
+  return {
+    complete: region.manual_complete,
+    semiComplete: region.manual_semi_complete,
+    incomplete: region.manual_incomplete,
+    notStarted: Math.max(
+      region.manual_total - region.manual_complete - region.manual_semi_complete - region.manual_incomplete,
+      0
+    ),
+    total: region.manual_total,
+  };
+}

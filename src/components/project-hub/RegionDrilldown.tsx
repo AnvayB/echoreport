@@ -11,17 +11,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import ProjectFormDialog, { type ProjectFormValues } from "./ProjectFormDialog";
+import RegionNotesDialog from "./RegionNotesDialog";
 import {
-  STATUS_LABEL, STATUS_BADGE_CLASS, tallyCounts, type ProjectStatus,
+  STATUS_LABEL, STATUS_BADGE_CLASS, effectiveCounts, type ProjectStatus, type RegionWithSnapshot,
 } from "@/lib/projectHubUtils";
 
-export interface Region {
-  id: string;
-  name: string;
-}
+export type Region = RegionWithSnapshot;
 
 export interface Project {
   id: string;
@@ -45,8 +43,9 @@ const RegionDrilldown = ({ region, projects, onBack, onProjectsChanged }: Region
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
 
-  const counts = tallyCounts(projects.map((p) => p.status));
+  const counts = effectiveCounts(region, projects.map((p) => p.status));
   const filtered = projects.filter((p) =>
     p.project_name.toLowerCase().includes(search.toLowerCase())
   );
@@ -99,18 +98,30 @@ const RegionDrilldown = ({ region, projects, onBack, onProjectsChanged }: Region
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h2 className="text-lg font-semibold">{region.name}</h2>
-          <p className="text-xs text-muted-foreground">
-            {counts.complete} complete / {counts.semiComplete} semi-complete /{" "}
-            {counts.incomplete} incomplete / {counts.notStarted} not started — {counts.total} total
-          </p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-lg font-semibold">{region.name}</h2>
+            <p className="text-xs text-muted-foreground">
+              {counts.complete} complete / {counts.semiComplete} semi-complete /{" "}
+              {counts.incomplete} incomplete / {counts.notStarted} not started — {counts.total} total
+              {projects.length === 0 && " (snapshot)"}
+            </p>
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setNotesOpen(true)}>
+          <MessageSquare className="mr-1 h-3.5 w-3.5" /> Notes
+        </Button>
       </div>
+
+      {region.notes && (
+        <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground whitespace-pre-wrap">
+          {region.notes}
+        </p>
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <Input
@@ -201,6 +212,13 @@ const RegionDrilldown = ({ region, projects, onBack, onProjectsChanged }: Region
             : undefined
         }
         onSubmit={handleSubmit}
+      />
+
+      <RegionNotesDialog
+        region={region}
+        open={notesOpen}
+        onOpenChange={setNotesOpen}
+        onSaved={onProjectsChanged}
       />
     </div>
   );

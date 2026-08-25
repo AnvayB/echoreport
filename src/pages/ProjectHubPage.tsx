@@ -10,12 +10,16 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, MessageSquare } from "lucide-react";
 import WorkflowFlowchart from "@/components/project-hub/WorkflowFlowchart";
 import RegionDrilldown, { type Region, type Project } from "@/components/project-hub/RegionDrilldown";
-import { tallyCounts } from "@/lib/projectHubUtils";
+import RegionNotesDialog from "@/components/project-hub/RegionNotesDialog";
+import { emptyCounts, effectiveCounts, type RegionCounts } from "@/lib/projectHubUtils";
 
 type View = "flowchart" | "regions" | "region-detail";
+
+const REGION_COLUMNS =
+  "id, name, notes, manual_complete, manual_semi_complete, manual_incomplete, manual_total";
 
 const ProjectHubPage = () => {
   const { user } = useAuth();
@@ -24,19 +28,28 @@ const ProjectHubPage = () => {
   const [regions, setRegions] = useState<Region[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  const [notesRegion, setNotesRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
   const [newRegionName, setNewRegionName] = useState("");
 
   const loadData = async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: regionData }, { data: projectData }] = await Promise.all([
-      supabase.from("ph_regions").select("id, name").eq("user_id", user.id).order("sort_order", { ascending: true }),
-      supabase
-        .from("ph_projects")
-        .select("id, region_id, project_name, status, status_notes, airtable_project_id")
-        .eq("user_id", user.id),
-    ]);
+    const [{ data: regionData, error: regionError }, { data: projectData, error: projectError }] =
+      await Promise.all([
+        supabase
+          .from("ph_regions")
+          .select(REGION_COLUMNS)
+          .eq("user_id", user.id)
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("ph_projects")
+          .select("id, region_id, project_name, status, status_notes, airtable_project_id")
+          .eq("user_id", user.id),
+      ]);
+    if (regionError || projectError) {
+      toast.error("Failed to load Project Hub data — the database tables may not be set up yet.");
+    }
     setRegions((regionData ?? []) as Region[]);
     setProjects((projectData ?? []) as Project[]);
     setLoading(false);
@@ -47,7 +60,19 @@ const ProjectHubPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const overallCounts = tallyCounts(projects.map((p) => p.status));
+  const overallCounts: RegionCounts = regions.reduce((acc, region) => {
+    const counts = effectiveCounts(
+      region,
+      projects.filter((p) => p.region_id === region.id).map((p) => p.status)
+    );
+    return {
+      complete: acc.complete + counts.complete,
+      semiComplete: acc.semiComplete + counts.semiComplete,
+      incomplete: acc.incomplete + counts.incomplete,
+      notStarted: acc.notStarted + counts.notStarted,
+      total: acc.total + counts.total,
+    };
+  }, emptyCounts());
 
   const handleAddRegion = async () => {
     if (!user || !newRegionName.trim()) return;
@@ -55,7 +80,7 @@ const ProjectHubPage = () => {
       .from("ph_regions")
       .insert({ user_id: user.id, name: newRegionName.trim(), sort_order: regions.length });
     if (error) {
-      toast.error("Failed to add region");
+      toast.error(`Failed to add region: ${error.message}`);
       return;
     }
     setNewRegionName("");
@@ -134,8 +159,10 @@ const ProjectHubPage = () => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {regions.map((region) => {
-                    const counts = tallyCounts(
-                      projects.filter((p) => p.region_id === region.id).map((p) => p.status)
+                    const regionProjects = projects.filter((p) => p.region_id === region.id);
+                    const counts = effectiveCounts(
+                      region,
+                      regionProjects.map((p) => p.status)
                     );
                     return (
                       <Card
@@ -152,34 +179,48 @@ const ProjectHubPage = () => {
                             <p className="text-xs text-muted-foreground mt-1">
                               {counts.complete}/{counts.semiComplete}/{counts.incomplete} |{" "}
                               {counts.total}
+                              {regionProjects.length === 0 && counts.total > 0 && " (snapshot)"}
                             </p>
                           </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete "{region.name}"?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will also delete all {counts.total} project(s) in this
-                                  region.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteRegion(region)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNotesRegion(region);
+                              }}
+                              title="Notes"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete "{region.name}"?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will also delete all {regionProjects.length} tracked
+                                    project row(s) in this region.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteRegion(region)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </CardContent>
                       </Card>
                     );
@@ -199,6 +240,13 @@ const ProjectHubPage = () => {
           )}
         </CardContent>
       </Card>
+
+      <RegionNotesDialog
+        region={notesRegion}
+        open={notesRegion !== null}
+        onOpenChange={(open) => !open && setNotesRegion(null)}
+        onSaved={loadData}
+      />
     </div>
   );
 };
