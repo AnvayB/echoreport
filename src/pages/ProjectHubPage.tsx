@@ -15,6 +15,8 @@ import {
   type RegionWithSnapshot,
 } from "@/lib/projectHubUtils";
 
+const PROJECT_HUB_OWNER_EMAIL = "anvay.bhanap@gmail.com";
+
 type View = "flowchart" | "regions";
 
 const REGION_COLUMNS =
@@ -37,6 +39,12 @@ const ProjectHubPage = () => {
   const [regions, setRegions] = useState<RegionWithSnapshot[]>([]);
   const [notesRegion, setNotesRegion] = useState<RegionWithSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user && user.email?.toLowerCase() !== PROJECT_HUB_OWNER_EMAIL.toLowerCase()) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   const loadData = async () => {
     if (!user) return;
