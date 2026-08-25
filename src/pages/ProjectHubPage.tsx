@@ -61,10 +61,30 @@ const ProjectHubPage = () => {
     if (regionError || projectError) {
       toast.error("Failed to load Project Hub data — the database tables may not be set up yet.");
     }
+
+    // First visit: seed the standard region set so the grid isn't empty.
+    if (!regionError && (regionData ?? []).length === 0) {
+      const { error: seedError } = await supabase.from("ph_regions").insert(
+        SEED_REGIONS.map((name, i) => ({ user_id: user.id, name, sort_order: i }))
+      );
+      if (!seedError) {
+        const { data: seeded } = await supabase
+          .from("ph_regions")
+          .select(REGION_COLUMNS)
+          .eq("user_id", user.id)
+          .order("sort_order", { ascending: true });
+        setRegions((seeded ?? []) as Region[]);
+        setProjects((projectData ?? []) as Project[]);
+        setLoading(false);
+        return;
+      }
+    }
+
     setRegions((regionData ?? []) as Region[]);
     setProjects((projectData ?? []) as Project[]);
     setLoading(false);
   };
+
 
   useEffect(() => {
     loadData();
