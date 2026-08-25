@@ -17,6 +17,7 @@ interface RegionNotesDialogProps {
 }
 
 const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesDialogProps) => {
+  const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [complete, setComplete] = useState(0);
   const [semiComplete, setSemiComplete] = useState(0);
@@ -26,6 +27,7 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
 
   useEffect(() => {
     if (open && region) {
+      setName(region.name);
       setNotes(region.notes);
       setComplete(region.manual_complete);
       setSemiComplete(region.manual_semi_complete);
@@ -40,6 +42,7 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
     const { error } = await supabase
       .from("ph_regions")
       .update({
+        name: name.trim() || region.name,
         notes,
         manual_complete: complete,
         manual_semi_complete: semiComplete,
@@ -56,6 +59,7 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
     onOpenChange(false);
     onSaved();
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
