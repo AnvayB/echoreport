@@ -69,9 +69,9 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{region?.name} — Notes & Status Snapshot</DialogTitle>
+          <DialogTitle>{region?.name} — Notes & Status</DialogTitle>
           <DialogDescription>
-            This snapshot shows until real projects are added to this region below.
+            Update this region's status counts and notes.
           </DialogDescription>
         </DialogHeader>
 
