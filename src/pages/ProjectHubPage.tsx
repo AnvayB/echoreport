@@ -15,6 +15,8 @@ import {
   type RegionWithSnapshot,
 } from "@/lib/projectHubUtils";
 
+const PROJECT_HUB_OWNER_EMAIL = "anvay.bhanap@gmail.com";
+
 type View = "flowchart" | "regions";
 
 const REGION_COLUMNS =
