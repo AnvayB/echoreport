@@ -40,6 +40,12 @@ const ProjectHubPage = () => {
   const [notesRegion, setNotesRegion] = useState<RegionWithSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    if (user && user.email?.toLowerCase() !== PROJECT_HUB_OWNER_EMAIL.toLowerCase()) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
   const loadData = async () => {
     if (!user) return;
     setLoading(true);
