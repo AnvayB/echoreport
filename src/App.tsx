@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import SettingsPage from "./pages/SettingsPage";
+import ProjectHubPage from "./pages/ProjectHubPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/project-hub" element={<ProjectHubPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
