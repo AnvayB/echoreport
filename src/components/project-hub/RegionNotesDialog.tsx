@@ -19,20 +19,24 @@ interface RegionNotesDialogProps {
 const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesDialogProps) => {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
-  const [complete, setComplete] = useState(0);
-  const [semiComplete, setSemiComplete] = useState(0);
-  const [incomplete, setIncomplete] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [complete, setComplete] = useState("0");
+  const [semiComplete, setSemiComplete] = useState("0");
+  const [incomplete, setIncomplete] = useState("0");
   const [saving, setSaving] = useState(false);
+
+  const num = (v: string) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  const total = num(complete) + num(semiComplete) + num(incomplete);
 
   useEffect(() => {
     if (open && region) {
       setName(region.name);
       setNotes(region.notes);
-      setComplete(region.manual_complete);
-      setSemiComplete(region.manual_semi_complete);
-      setIncomplete(region.manual_incomplete);
-      setTotal(region.manual_total);
+      setComplete(String(region.manual_complete));
+      setSemiComplete(String(region.manual_semi_complete));
+      setIncomplete(String(region.manual_incomplete));
     }
   }, [open, region]);
 
