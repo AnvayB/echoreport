@@ -4,13 +4,13 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Loader2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, MessageSquare } from "lucide-react";
 import WorkflowFlowchart from "@/components/project-hub/WorkflowFlowchart";
 import RegionDrilldown, { type Region, type Project } from "@/components/project-hub/RegionDrilldown";
 import RegionNotesDialog from "@/components/project-hub/RegionNotesDialog";
@@ -41,7 +41,7 @@ const ProjectHubPage = () => {
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [notesRegion, setNotesRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
-  const [newRegionName, setNewRegionName] = useState("");
+  
 
   const loadData = async () => {
     if (!user) return;
@@ -105,19 +105,6 @@ const ProjectHubPage = () => {
     };
   }, emptyCounts());
 
-  const handleAddRegion = async () => {
-    if (!user || !newRegionName.trim()) return;
-    const { error } = await supabase
-      .from("ph_regions")
-      .insert({ user_id: user.id, name: newRegionName.trim(), sort_order: regions.length });
-    if (error) {
-      toast.error(`Failed to add region: ${error.message}`);
-      return;
-    }
-    setNewRegionName("");
-    toast.success("Region added");
-    loadData();
-  };
 
   const handleDeleteRegion = async (region: Region) => {
     const { error } = await supabase.from("ph_regions").delete().eq("id", region.id);
@@ -170,22 +157,10 @@ const ProjectHubPage = () => {
                 <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Workflow
               </Button>
 
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newRegionName}
-                  onChange={(e) => setNewRegionName(e.target.value)}
-                  placeholder="New region name"
-                  className="max-w-xs"
-                  onKeyDown={(e) => e.key === "Enter" && handleAddRegion()}
-                />
-                <Button size="sm" onClick={handleAddRegion} disabled={!newRegionName.trim()}>
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add Region
-                </Button>
-              </div>
 
               {regions.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  No regions yet — add one above to start tracking projects.
+                  No regions available.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
