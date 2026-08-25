@@ -72,6 +72,11 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
         </DialogHeader>
 
         <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Region name</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+
           <div className="grid grid-cols-4 gap-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Complete</label>
