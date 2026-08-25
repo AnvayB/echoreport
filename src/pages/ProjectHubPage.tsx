@@ -135,12 +135,26 @@ const ProjectHubPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {regions.map((region) => {
                     const counts = effectiveCounts(region, []);
+                    const max = Math.max(
+                      counts.complete,
+                      counts.semiComplete,
+                      counts.incomplete
+                    );
+                    const tint =
+                      max === 0
+                        ? "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30"
+                        : counts.complete === max
+                          ? "bg-green-50 hover:bg-green-100/70 dark:bg-green-950/30"
+                          : counts.semiComplete === max
+                            ? "bg-yellow-50 hover:bg-yellow-100/70 dark:bg-yellow-950/30"
+                            : "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30";
                     return (
                       <Card
                         key={region.id}
-                        className="cursor-pointer hover:border-primary hover:bg-accent/50 transition-colors"
+                        className={`cursor-pointer hover:border-primary transition-colors ${tint}`}
                         onClick={() => setNotesRegion(region)}
                       >
+
                         <CardContent className="p-4 flex items-start justify-between gap-2">
                           <div>
                             <h3 className="text-sm font-semibold">{region.name}</h3>
