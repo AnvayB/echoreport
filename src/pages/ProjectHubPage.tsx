@@ -21,6 +21,17 @@ type View = "flowchart" | "regions" | "region-detail";
 const REGION_COLUMNS =
   "id, name, notes, manual_complete, manual_semi_complete, manual_incomplete, manual_total";
 
+const SEED_REGIONS = [
+  "EMEA",
+  "China (SIP)",
+  "China (SIA)",
+  "Korea",
+  "USA (SIP)",
+  "USA (SIA)",
+  "Japan",
+];
+
+
 const ProjectHubPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
