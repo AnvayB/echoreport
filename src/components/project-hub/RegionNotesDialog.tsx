@@ -19,20 +19,24 @@ interface RegionNotesDialogProps {
 const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesDialogProps) => {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
-  const [complete, setComplete] = useState(0);
-  const [semiComplete, setSemiComplete] = useState(0);
-  const [incomplete, setIncomplete] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [complete, setComplete] = useState("0");
+  const [semiComplete, setSemiComplete] = useState("0");
+  const [incomplete, setIncomplete] = useState("0");
   const [saving, setSaving] = useState(false);
+
+  const num = (v: string) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  const total = num(complete) + num(semiComplete) + num(incomplete);
 
   useEffect(() => {
     if (open && region) {
       setName(region.name);
       setNotes(region.notes);
-      setComplete(region.manual_complete);
-      setSemiComplete(region.manual_semi_complete);
-      setIncomplete(region.manual_incomplete);
-      setTotal(region.manual_total);
+      setComplete(String(region.manual_complete));
+      setSemiComplete(String(region.manual_semi_complete));
+      setIncomplete(String(region.manual_incomplete));
     }
   }, [open, region]);
 
@@ -44,9 +48,9 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
       .update({
         name: name.trim() || region.name,
         notes,
-        manual_complete: complete,
-        manual_semi_complete: semiComplete,
-        manual_incomplete: incomplete,
+        manual_complete: num(complete),
+        manual_semi_complete: num(semiComplete),
+        manual_incomplete: num(incomplete),
         manual_total: total,
       })
       .eq("id", region.id);
@@ -81,40 +85,36 @@ const RegionNotesDialog = ({ region, open, onOpenChange, onSaved }: RegionNotesD
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Complete</label>
               <Input
-                type="number"
-                min={0}
+                inputMode="numeric"
                 value={complete}
-                onChange={(e) => setComplete(Number(e.target.value))}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => setComplete(e.target.value.replace(/[^0-9]/g, ""))}
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Semi</label>
               <Input
-                type="number"
-                min={0}
+                inputMode="numeric"
                 value={semiComplete}
-                onChange={(e) => setSemiComplete(Number(e.target.value))}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => setSemiComplete(e.target.value.replace(/[^0-9]/g, ""))}
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Incomplete</label>
               <Input
-                type="number"
-                min={0}
+                inputMode="numeric"
                 value={incomplete}
-                onChange={(e) => setIncomplete(Number(e.target.value))}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => setIncomplete(e.target.value.replace(/[^0-9]/g, ""))}
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Total</label>
-              <Input
-                type="number"
-                min={0}
-                value={total}
-                onChange={(e) => setTotal(Number(e.target.value))}
-              />
+              <Input value={total} readOnly tabIndex={-1} className="bg-muted/50" />
             </div>
           </div>
+
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Notes</label>
