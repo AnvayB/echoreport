@@ -241,7 +241,7 @@ const WorkflowFlowchart = ({ onSelectRegionStage, overallCounts }: WorkflowFlowc
                   description={stage.description}
                   optional={stage.optional}
                   onClick={isRegionStage ? onSelectRegionStage : undefined}
-                  counts={isRegionStage ? overallCounts : undefined}
+                  
                   done={doneStages.has(num)}
                   onToggleDone={() => toggleDone(num)}
                 />
