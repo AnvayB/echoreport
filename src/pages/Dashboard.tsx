@@ -46,9 +46,11 @@ const Dashboard = () => {
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
           <h1 className="text-xl font-bold">Echo Report</h1>
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/project-hub")}>
-              <Workflow className="h-4 w-4" />
-            </Button>
+            {user?.email?.toLowerCase() === PROJECT_HUB_OWNER_EMAIL.toLowerCase() && (
+              <Button variant="ghost" size="icon" onClick={() => navigate("/project-hub")}>
+                <Workflow className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
               <Settings className="h-4 w-4" />
             </Button>
