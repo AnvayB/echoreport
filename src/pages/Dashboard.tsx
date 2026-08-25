@@ -12,6 +12,8 @@ import { ChevronLeft, ChevronRight, LogOut, Settings, Workflow } from "lucide-re
 import { isSameDay } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
+const PROJECT_HUB_OWNER_EMAIL = "anvay.bhanap@gmail.com";
+
 const Dashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
