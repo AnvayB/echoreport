@@ -33,24 +33,27 @@ const SEED_REGIONS = [
 ];
 
 const ProjectHubPage = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState<View>("flowchart");
   const [regions, setRegions] = useState<RegionWithSnapshot[]>([]);
   const [notesRegion, setNotesRegion] = useState<RegionWithSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isOwner = user?.email?.toLowerCase() === PROJECT_HUB_OWNER_EMAIL.toLowerCase();
+
   useEffect(() => {
-    if (user && user.email?.toLowerCase() !== PROJECT_HUB_OWNER_EMAIL.toLowerCase()) {
-      navigate("/");
-    }
-  }, [user, navigate]);
+    if (authLoading) return;
+    if (!user || !isOwner) navigate("/", { replace: true });
+  }, [authLoading, user, isOwner, navigate]);
+
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user || !isOwner) return;
     setLoading(true);
     const { data: regionData, error: regionError } = await supabase
       .from("ph_regions")
+
       .select(REGION_COLUMNS)
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true });
@@ -81,9 +84,10 @@ const ProjectHubPage = () => {
   };
 
   useEffect(() => {
-    loadData();
+    if (!authLoading && isOwner) loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, authLoading, isOwner]);
+
 
   const overallCounts: RegionCounts = regions.reduce((acc, region) => {
     const counts = effectiveCounts(region, []);
@@ -96,13 +100,14 @@ const ProjectHubPage = () => {
     };
   }, emptyCounts());
 
-  if (loading) {
+  if (authLoading || !isOwner || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
+
 
   return (
     <div className="mx-auto max-w-6xl p-4 space-y-4">

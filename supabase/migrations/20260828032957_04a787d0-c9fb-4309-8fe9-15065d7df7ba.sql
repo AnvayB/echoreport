@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.is_ph_owner() FROM PUBLIC, anon, authenticated, service_role;
