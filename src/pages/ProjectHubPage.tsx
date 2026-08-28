@@ -100,13 +100,14 @@ const ProjectHubPage = () => {
     };
   }, emptyCounts());
 
-  if (loading) {
+  if (authLoading || !isOwner || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
+
 
   return (
     <div className="mx-auto max-w-6xl p-4 space-y-4">
