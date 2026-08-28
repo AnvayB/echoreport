@@ -51,8 +51,9 @@ const ProjectHubPage = () => {
   const loadData = async () => {
     if (!user || !isOwner) return;
     setLoading(true);
-
+    const { data: regionData, error: regionError } = await supabase
       .from("ph_regions")
+
       .select(REGION_COLUMNS)
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true });
