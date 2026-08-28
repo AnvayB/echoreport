@@ -306,7 +306,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_ph_owner: { Args: never; Returns: boolean }
     }
     Enums: {
       ph_project_status:
