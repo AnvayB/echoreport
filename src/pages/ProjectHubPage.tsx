@@ -84,9 +84,10 @@ const ProjectHubPage = () => {
   };
 
   useEffect(() => {
-    loadData();
+    if (!authLoading && isOwner) loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, authLoading, isOwner]);
+
 
   const overallCounts: RegionCounts = regions.reduce((acc, region) => {
     const counts = effectiveCounts(region, []);
