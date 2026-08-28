@@ -33,18 +33,20 @@ const SEED_REGIONS = [
 ];
 
 const ProjectHubPage = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState<View>("flowchart");
   const [regions, setRegions] = useState<RegionWithSnapshot[]>([]);
   const [notesRegion, setNotesRegion] = useState<RegionWithSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isOwner = user?.email?.toLowerCase() === PROJECT_HUB_OWNER_EMAIL.toLowerCase();
+
   useEffect(() => {
-    if (user && user.email?.toLowerCase() !== PROJECT_HUB_OWNER_EMAIL.toLowerCase()) {
-      navigate("/");
-    }
-  }, [user, navigate]);
+    if (authLoading) return;
+    if (!user || !isOwner) navigate("/", { replace: true });
+  }, [authLoading, user, isOwner, navigate]);
+
 
   const loadData = async () => {
     if (!user) return;
