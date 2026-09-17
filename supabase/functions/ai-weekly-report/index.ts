@@ -120,7 +120,8 @@ ${groupingRule}
   3. From "Older backlog": include ONLY items that are clearly related to this week's completed work or themes. Skip generic long-running items that have no connection to the current week.
   4. Do NOT just dump the entire backlog. A realistic carry-over list has 3–8 focused items.
 - Open blockers go under the blockers/challenges section.
-- Output the full email as plain text ready to copy-paste. No markdown code fences.`;
+- Output valid markdown, matching the template's structure: "#"/"##"/"###" for section and sub-section headings, "**bold**" for labels and emphasis, and "-" for bullet points. Do not use code fences.
+- Sparingly, wrap only the handful of most important phrases (a critical deadline, a major risk) in literal "<u>" and "</u>" tags for underline emphasis. Do not underline entire sentences or every bullet.`;
 
     const userPrompt = `Generate my weekly status update email for the week of ${weekLabel}.
 
