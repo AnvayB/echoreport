@@ -60,6 +60,7 @@ export interface TasksForTodayContextValue {
   editTaskText: (row: TaskRow, newText: string) => Promise<void>;
   deleteTask: (row: TaskRow) => Promise<void>;
   moveTaskToBucket: (row: TaskRow, bucket: Bucket) => Promise<void>;
+  moveTaskToGroup: (row: TaskRow, groupTitle: string) => Promise<void>;
   addMoreTasks: () => Promise<void>;
   reload: () => Promise<void>;
 }

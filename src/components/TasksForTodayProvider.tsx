@@ -578,6 +578,29 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
   };
 
+  // Manually reassigns a task to a different (existing) topic group via drag-and-drop.
+  // This never calls the AI grouper — it's the low-cost way to fix a mis-grouped task.
+  const moveTaskToGroup = async (row: TaskRow, groupTitle: string) => {
+    if (!user) return;
+    const alreadyInBacklog = bucketOf(row.task_date) === "backlog";
+    const targetDate = alreadyInBacklog ? row.task_date : formatDateKey(addDays(today, -1));
+    if (row.group_title === groupTitle && alreadyInBacklog) return;
+
+    const prev = pending;
+    setPending((list) =>
+      list.map((r) => (r.id === row.id ? { ...r, group_title: groupTitle, task_date: targetDate } : r))
+    );
+
+    const updates: { group_title: string; task_date?: string } = { group_title: groupTitle };
+    if (!alreadyInBacklog) updates.task_date = targetDate;
+
+    const { error } = await supabase.from("daily_tasks").update(updates).eq("id", row.id);
+    if (error) {
+      toast.error("Couldn't move task");
+      setPending(prev);
+    }
+  };
+
   const addMoreTasks = async () => {
     if (!user) return;
     const text = newTasksText.trim();
@@ -730,6 +753,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         editTaskText,
         deleteTask,
         moveTaskToBucket,
+        moveTaskToGroup,
         addMoreTasks,
         reload: load,
         duplicateClusters: visibleDuplicateClusters,

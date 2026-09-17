@@ -30,12 +30,13 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     pendingByBucket, grouping, regroupingAll, regroupAll,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
-    toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant, editTaskText,
+    toggleTask, deleteTask, moveTaskToBucket, moveTaskToGroup, addMoreTasks, reload, setTaskImportant, editTaskText,
     isViewingToday, bucketLabels,
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
+  const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
@@ -127,6 +128,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             onDragEnd={() => {
               setDraggingId(null);
               setDragOverBucket(null);
+              setDragOverGroupKey(null);
             }}
             className={`flex items-start gap-1.5 cursor-pointer group transition-opacity ${isDragging ? "opacity-40" : ""} ${isEditing ? "cursor-default" : ""}`}
           >
@@ -296,8 +298,33 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               const titleKey = `${bucket}:${gi}`;
               const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
               const isEditingTitle = editingGroupTitle === titleKey;
+              const isGroupOver = dragOverGroupKey === titleKey;
               return (
-                <div key={gi} className="pl-1">
+                <div
+                  key={gi}
+                  onDragOver={(e) => {
+                    if (!draggingId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverGroupKey !== titleKey) setDragOverGroupKey(titleKey);
+                  }}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    if (dragOverGroupKey === titleKey) setDragOverGroupKey(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const id = e.dataTransfer.getData("text/plain");
+                    const row = pending.find((r) => r.id === id);
+                    setDragOverGroupKey(null);
+                    setDragOverBucket(null);
+                    setDraggingId(null);
+                    if (row) moveTaskToGroup(row, g.title);
+                  }}
+                  className={`pl-1 rounded-md transition-colors ${isGroupOver ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
+                >
                   <ContextMenu>
                     <ContextMenuTrigger asChild>
                       <div>
