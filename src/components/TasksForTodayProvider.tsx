@@ -104,6 +104,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [blockers, setBlockers] = useState<TaskRow[]>([]);
   const [pendingGroups, setPendingGroups] = useState<TaskGroup[] | null>(null);
   const [grouping, setGrouping] = useState(false);
+  const [regroupingAll, setRegroupingAll] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -217,12 +218,21 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       return;
     }
 
+    const existingGroups = [...new Set(
+      pending
+        .filter((r) => r.group_title && r.group_title !== "Other")
+        .map((r) => r.group_title as string)
+    )];
+
     let cancelled = false;
     setGrouping(true);
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
-          body: { tasks: ungrouped.map((r) => ({ id: r.id, task_text: r.task_text })) },
+          body: {
+            tasks: ungrouped.map((r) => ({ id: r.id, task_text: r.task_text })),
+            existingGroups,
+          },
         });
         if (cancelled) return;
         if (error) throw error;
@@ -289,6 +299,48 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         supabase.from("daily_tasks").update({ group_title: title }).in("id", ids)
       )
     );
+  };
+
+  // Re-groups every pending task from scratch into a smaller set of broader topics,
+  // merging existing singleton/near-duplicate groups instead of only slotting in new tasks.
+  const regroupAll = async () => {
+    if (pending.length === 0 || regroupingAll) return;
+    setRegroupingAll(true);
+    try {
+      const maxGroups = Math.max(4, Math.min(10, Math.ceil(pending.length / 6)));
+      const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
+        body: {
+          tasks: pending.map((r) => ({ id: r.id, task_text: r.task_text })),
+          maxGroups,
+        },
+      });
+      if (error) throw error;
+      const rawGroups: Array<{ title: string; task_ids: string[] }> = Array.isArray(data?.groups) ? data.groups : [];
+      if (data?.unavailable || rawGroups.length === 0) {
+        toast.error("Couldn't consolidate topics right now. Try again shortly.");
+        return;
+      }
+
+      const assignments = new Map<string, string>();
+      rawGroups.forEach((g) => {
+        (g.task_ids || []).forEach((id) => {
+          if (!assignments.has(id)) assignments.set(id, g.title);
+        });
+      });
+      pending.forEach((r) => {
+        if (!assignments.has(r.id)) assignments.set(r.id, "Other");
+      });
+
+      await persistGroupAssignments(assignments);
+      setPending((list) =>
+        list.map((r) => (assignments.has(r.id) ? { ...r, group_title: assignments.get(r.id)! } : r))
+      );
+    } catch (e) {
+      console.error("Failed to consolidate topics:", e);
+      toast.error("Couldn't consolidate topics right now. Try again shortly.");
+    } finally {
+      setRegroupingAll(false);
+    }
   };
 
 
@@ -665,6 +717,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         pendingByBucket,
         pendingGroups,
         grouping,
+        regroupingAll,
+        regroupAll,
         savingId,
         savedId,
         bucketLabels,

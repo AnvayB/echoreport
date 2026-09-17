@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -27,7 +27,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const {
     loading, loaded,
     completedYesterday, completedYesterdayDate, completedToday, pending, blockers,
-    pendingByBucket, grouping,
+    pendingByBucket, grouping, regroupingAll, regroupAll,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, addMoreTasks, reload, setTaskImportant, editTaskText,
@@ -494,6 +494,16 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
           >
             <Dices className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={regroupAll}
+            disabled={loading || adding || regroupingAll || pending.length === 0}
+            aria-label="Consolidate topics"
+            title="Consolidate topics into fewer, broader groups"
+            className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <Layers className={`h-4 w-4 ${regroupingAll ? "animate-pulse" : ""}`} />
           </button>
           <button
             type="button"
