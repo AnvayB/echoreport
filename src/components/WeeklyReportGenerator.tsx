@@ -272,7 +272,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     toast.success("Downloaded");
   };
 
-  const openInOutlook = async () => {
+  const openInOutlook = () => {
     const lines = draft.split("\n");
     const subjectIdx = lines.findIndex((l) => /^\s*subject\s*:/i.test(l));
     const subject =
@@ -280,38 +280,35 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         ? lines[subjectIdx].replace(/^\s*subject\s*:\s*/i, "").trim()
         : `Weekly Report — ${formatWeekLabel(currentWeek)}`;
     const body = (subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines).join("\n").trim();
+    const plainBody = toPlainText(body);
 
-    // Outlook's compose deeplink only accepts a plain-text body, so the reliable way
-    // to land styled (bold/underline/bulleted) content in the email is to put real
-    // HTML on the clipboard and have the user paste it into the empty draft.
-    let styledCopySucceeded = false;
-    try {
-      const html = markdownToEmailHtml(body);
-      const plain = toPlainText(body);
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plain], { type: "text/plain" }),
-        }),
-      ]);
-      styledCopySucceeded = true;
-    } catch (e) {
-      console.warn("Rich clipboard copy failed, falling back to plain text", e);
-    }
-
-    const url = styledCopySucceeded
-      ? "https://outlook.office.com/mail/deeplink/compose?subject=" + encodeURIComponent(subject)
-      : "https://outlook.office.com/mail/deeplink/compose?subject=" +
-        encodeURIComponent(subject) +
-        "&body=" +
-        encodeURIComponent(toPlainText(body));
+    // Outlook's compose deeplink only accepts a plain-text body, so always fill it in
+    // via the URL first — this must never come up empty. Open it synchronously (no
+    // await beforehand) so browsers don't treat it as a blocked, non-user-initiated popup.
+    const url =
+      "https://outlook.office.com/mail/deeplink/compose?subject=" +
+      encodeURIComponent(subject) +
+      "&body=" +
+      encodeURIComponent(plainBody);
     window.open(url, "_blank", "noopener,noreferrer");
 
-    if (styledCopySucceeded) {
-      toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
-    } else {
-      toast.error("Couldn't copy styled formatting — opened with plain text instead");
-    }
+    // Bonus, best-effort: also put a styled HTML version on the clipboard so the user
+    // can select-all + paste over the plain-text body to pick up bold/underline/bullets.
+    (async () => {
+      try {
+        const html = markdownToEmailHtml(body);
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plainBody], { type: "text/plain" }),
+          }),
+        ]);
+        toast.success("Opened in Outlook — paste (Ctrl/Cmd+V) to swap in the styled version");
+      } catch (e) {
+        console.warn("Rich clipboard copy failed; plain-text body was still filled in", e);
+        toast.success("Opened in Outlook");
+      }
+    })();
   };
 
   return (
