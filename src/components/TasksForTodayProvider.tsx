@@ -104,6 +104,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [blockers, setBlockers] = useState<TaskRow[]>([]);
   const [pendingGroups, setPendingGroups] = useState<TaskGroup[] | null>(null);
   const [grouping, setGrouping] = useState(false);
+  const [regroupingAll, setRegroupingAll] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -217,12 +218,21 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       return;
     }
 
+    const existingGroups = [...new Set(
+      pending
+        .filter((r) => r.group_title && r.group_title !== "Other")
+        .map((r) => r.group_title as string)
+    )];
+
     let cancelled = false;
     setGrouping(true);
     (async () => {
       try {
         const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
-          body: { tasks: ungrouped.map((r) => ({ id: r.id, task_text: r.task_text })) },
+          body: {
+            tasks: ungrouped.map((r) => ({ id: r.id, task_text: r.task_text })),
+            existingGroups,
+          },
         });
         if (cancelled) return;
         if (error) throw error;
@@ -289,6 +299,48 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         supabase.from("daily_tasks").update({ group_title: title }).in("id", ids)
       )
     );
+  };
+
+  // Re-groups every pending task from scratch into a smaller set of broader topics,
+  // merging existing singleton/near-duplicate groups instead of only slotting in new tasks.
+  const regroupAll = async () => {
+    if (pending.length === 0 || regroupingAll) return;
+    setRegroupingAll(true);
+    try {
+      const maxGroups = Math.max(4, Math.min(10, Math.ceil(pending.length / 6)));
+      const { data, error } = await supabase.functions.invoke("ai-group-tasks", {
+        body: {
+          tasks: pending.map((r) => ({ id: r.id, task_text: r.task_text })),
+          maxGroups,
+        },
+      });
+      if (error) throw error;
+      const rawGroups: Array<{ title: string; task_ids: string[] }> = Array.isArray(data?.groups) ? data.groups : [];
+      if (data?.unavailable || rawGroups.length === 0) {
+        toast.error("Couldn't consolidate topics right now. Try again shortly.");
+        return;
+      }
+
+      const assignments = new Map<string, string>();
+      rawGroups.forEach((g) => {
+        (g.task_ids || []).forEach((id) => {
+          if (!assignments.has(id)) assignments.set(id, g.title);
+        });
+      });
+      pending.forEach((r) => {
+        if (!assignments.has(r.id)) assignments.set(r.id, "Other");
+      });
+
+      await persistGroupAssignments(assignments);
+      setPending((list) =>
+        list.map((r) => (assignments.has(r.id) ? { ...r, group_title: assignments.get(r.id)! } : r))
+      );
+    } catch (e) {
+      console.error("Failed to consolidate topics:", e);
+      toast.error("Couldn't consolidate topics right now. Try again shortly.");
+    } finally {
+      setRegroupingAll(false);
+    }
   };
 
 
@@ -526,6 +578,29 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
   };
 
+  // Manually reassigns a task to a different (existing) topic group via drag-and-drop.
+  // This never calls the AI grouper — it's the low-cost way to fix a mis-grouped task.
+  const moveTaskToGroup = async (row: TaskRow, groupTitle: string) => {
+    if (!user) return;
+    const alreadyInBacklog = bucketOf(row.task_date) === "backlog";
+    const targetDate = alreadyInBacklog ? row.task_date : formatDateKey(addDays(today, -1));
+    if (row.group_title === groupTitle && alreadyInBacklog) return;
+
+    const prev = pending;
+    setPending((list) =>
+      list.map((r) => (r.id === row.id ? { ...r, group_title: groupTitle, task_date: targetDate } : r))
+    );
+
+    const updates: { group_title: string; task_date?: string } = { group_title: groupTitle };
+    if (!alreadyInBacklog) updates.task_date = targetDate;
+
+    const { error } = await supabase.from("daily_tasks").update(updates).eq("id", row.id);
+    if (error) {
+      toast.error("Couldn't move task");
+      setPending(prev);
+    }
+  };
+
   const addMoreTasks = async () => {
     if (!user) return;
     const text = newTasksText.trim();
@@ -665,6 +740,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         pendingByBucket,
         pendingGroups,
         grouping,
+        regroupingAll,
+        regroupAll,
         savingId,
         savedId,
         bucketLabels,
@@ -676,6 +753,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         editTaskText,
         deleteTask,
         moveTaskToBucket,
+        moveTaskToGroup,
         addMoreTasks,
         reload: load,
         duplicateClusters: visibleDuplicateClusters,

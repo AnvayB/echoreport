@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { tasks } = await req.json();
+    const { tasks, existingGroups, maxGroups } = await req.json();
     if (!Array.isArray(tasks) || tasks.length === 0) {
       return new Response(JSON.stringify({ groups: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -24,10 +24,18 @@ serve(async (req) => {
       .map((t: { id: string; task_text: string }, i: number) => `${i + 1}. [id=${t.id}] ${t.task_text}`)
       .join("\n");
 
+    const distinctExistingGroups: string[] = Array.isArray(existingGroups)
+      ? [...new Set(existingGroups.filter((g: unknown): g is string => typeof g === "string" && g.trim().length > 0))]
+      : [];
+    const groupCap = Number.isFinite(maxGroups) && maxGroups > 0 ? Math.round(maxGroups) : 6;
+
     const systemPrompt = `You group tasks by project, theme, or workstream so the user can scan them quickly.
 
 You MUST respond by calling the group_tasks tool. Rules:
-- Pick 2-6 short, specific group titles (2-5 words each) based on the actual tasks. Examples: "Databricks Integration", "Jira Sync", "ACL Coordination", "Hubspot Dataset". Avoid generic catch-alls like "Other Tasks" unless a task truly doesn't fit any other group.
+- Favor broad, general themes over narrow, one-off categories. Never create a group for just one task if it can reasonably fit under a broader existing or new theme instead.
+- Aim for at most ${groupCap} groups total. Only exceed that if some tasks are genuinely unrelated to everything else.
+- Short, specific group titles (2-5 words each), e.g. "Databricks Integration", "Jira Sync", "ACL Coordination".${distinctExistingGroups.length > 0 ? ` These group titles are already in use by other tasks: ${distinctExistingGroups.join(", ")}. Reuse one of these titles VERBATIM (exact spelling/casing) whenever a task reasonably fits under it, instead of inventing a new, similar-sounding title. Only introduce a new title when none of the existing ones fit.` : ""}
+- Avoid generic catch-alls like "Other Tasks" or "Miscellaneous" unless a task truly doesn't fit any other group.
 - Every input task id MUST appear in exactly ONE group. Do not invent ids. Do not drop any ids. Count the input ids and verify your output has the same count.
 - If there are only 1-3 tasks total and they clearly belong to different themes, use one group per theme. If they're all related, use a single group.
 - Order groups roughly by size (largest first).
