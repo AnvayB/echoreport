@@ -57,7 +57,7 @@ serve(async (req) => {
     const fmtTaskList = (rows: DailyTask[]) =>
       rows.length === 0
         ? "  (none)"
-        : rows.map((r) => `  - [${r.task_date}] ${r.task_text}`).join("\n");
+        : rows.map((r) => `  - ${r.task_text}`).join("\n");
 
     const fmtGrouped = (rows: DailyTask[]) => {
       if (rows.length === 0) return "  (none)";
@@ -76,7 +76,7 @@ serve(async (req) => {
         .map(
           (title) =>
             `  [Group: ${title}]\n` +
-            buckets.get(title)!.map((r) => `    - [${r.task_date}] ${r.task_text}`).join("\n")
+            (buckets.get(title) || []).map((r) => `    - ${r.task_text}`).join("\n")
         )
         .join("\n");
     };
@@ -104,7 +104,7 @@ serve(async (req) => {
       : "Write a professional weekly status update email.";
 
     const groupingRule = groupTitleById.size > 0
-      ? `- Inside the "Completed Tasks" and "Carry-over / Next Week" sections, organize tasks under the "[Group: ...]" project/theme headings supplied in the authoritative task state. Render each group as a "**Group Title**" subheading followed by that group's bullets. Preserve the group titles verbatim. Do not invent new groups or merge groups. Keep the overall email structure from the template (highlights, lowlights/challenges, completed, carry-over, blockers) — the groupings only apply WITHIN the completed and carry-over sections.`
+      ? `- Inside the "Completed Tasks" and "Carry-over / Next Week" sections, organize tasks under the "[Group: ...]" project/theme headings supplied in the authoritative task state. Render each group exactly as "<u>Group: Group Title</u>" followed by that group's bullets. Group labels must be underlined only, never bold. Preserve the group titles verbatim. Do not invent new groups or merge groups. Keep the overall email structure from the template (highlights, lowlights/challenges, completed, carry-over, blockers) — the groupings only apply WITHIN the completed and carry-over sections.`
       : `- Present completed tasks and carry-over as flat bullet lists.`;
 
     const systemPrompt = `You are a professional assistant that writes weekly status update emails. ${templateInstruction}
@@ -120,6 +120,8 @@ ${groupingRule}
   3. From "Older backlog": include ONLY items that are clearly related to this week's completed work or themes. Skip generic long-running items that have no connection to the current week.
   4. Do NOT just dump the entire backlog. A realistic carry-over list has 3–8 focused items.
 - Open blockers go under the blockers/challenges section.
+- Render the section labels "Completed Tasks", "Highlights", "Lowlights", and "Carry-over / Next Week" as bold text using **Label**. Do not underline these section labels.
+- Never include task dates, bracketed ISO dates, or completion dates in the output. Dates in the source data are context only.
 - Output valid markdown, matching the template's structure: "#"/"##"/"###" for section and sub-section headings, "**bold**" for labels and emphasis, and "-" for bullet points. Do not use code fences.
 - Sparingly, wrap only the handful of most important phrases (a critical deadline, a major risk) in literal "<u>" and "</u>" tags for underline emphasis. Do not underline entire sentences or every bullet.`;
 

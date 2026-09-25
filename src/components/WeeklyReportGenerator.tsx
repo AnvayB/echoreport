@@ -32,6 +32,41 @@ const toPlainText = (text: string) =>
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const REPORT_SECTION_LABELS = [
+  "Completed Tasks",
+  "Highlights",
+  "Lowlights",
+  "Carry-over / Next Week",
+];
+
+const normalizeWeeklyReport = (report: string) =>
+  report
+    .split("\n")
+    .map((rawLine) => {
+      // Dates are useful to the model for determining task state, but should not
+      // appear in the finished email.
+      const withoutTaskDate = rawLine.replace(/(\s*[-*]\s+)\[\d{4}-\d{2}-\d{2}\]\s*/g, "$1");
+      const plainLine = withoutTaskDate
+        .trim()
+        .replace(/^#{1,6}\s*/, "")
+        .replace(/^\*\*(.*?)\*\*$/, "$1")
+        .replace(/^<u>(.*?)<\/u>$/i, "$1")
+        .trim();
+
+      const section = REPORT_SECTION_LABELS.find(
+        (label) => plainLine.toLowerCase() === label.toLowerCase(),
+      );
+      if (section) return `**${section}**`;
+
+      if (/^group\s*:/i.test(plainLine)) {
+        return `<u>${plainLine}</u>`;
+      }
+
+      return withoutTaskDate;
+    })
+    .join("\n")
+    .trim();
+
 // Renders the AI's markdown into inline-styled HTML so pasting into Outlook keeps
 // headings/bold/underline/bullets instead of landing as literal asterisks.
 const markdownToEmailHtml = (markdown: string): string => {
@@ -240,7 +275,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         },
       });
       if (error) throw error;
-      setDraft(data.report || "");
+      setDraft(normalizeWeeklyReport(data.report || ""));
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate report");
@@ -281,6 +316,11 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         : `Weekly Report — ${formatWeekLabel(currentWeek)}`;
     const body = (subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines).join("\n").trim();
 
+    // Open synchronously from the click so browsers do not block the tab while the
+    // clipboard operation is running.
+    const outlookWindow = window.open("about:blank", "_blank");
+    if (outlookWindow) outlookWindow.opener = null;
+
     // Outlook's compose deeplink only accepts a plain-text body, so the reliable way
     // to land styled (bold/underline/bulleted) content in the email is to put real
     // HTML on the clipboard and have the user paste it into the empty draft.
@@ -305,7 +345,11 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
         encodeURIComponent(subject) +
         "&body=" +
         encodeURIComponent(toPlainText(body));
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (outlookWindow) {
+      outlookWindow.location.href = url;
+    } else {
+      window.location.href = url;
+    }
 
     if (styledCopySucceeded) {
       toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
