@@ -45,7 +45,7 @@ export interface TasksForTodayContextValue {
   pendingGroups: TaskGroup[] | null; // legacy: flat groups across all buckets
   grouping: boolean;
   regroupingAll: boolean;
-  regroupAll: () => Promise<void>;
+  regroupAll: (instructions?: string) => Promise<void>;
   savingId: string | null;
   savedId: string | null;
   bucketLabels: Record<Bucket, string>;

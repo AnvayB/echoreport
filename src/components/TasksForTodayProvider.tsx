@@ -303,7 +303,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
 
   // Re-groups every pending task from scratch into a smaller set of broader topics,
   // merging existing singleton/near-duplicate groups instead of only slotting in new tasks.
-  const regroupAll = async () => {
+  const regroupAll = async (instructions?: string) => {
     if (pending.length === 0 || regroupingAll) return;
     setRegroupingAll(true);
     try {
@@ -312,6 +312,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         body: {
           tasks: pending.map((r) => ({ id: r.id, task_text: r.task_text })),
           maxGroups,
+          instructions: instructions?.trim() || undefined,
         },
       });
       if (error) throw error;
