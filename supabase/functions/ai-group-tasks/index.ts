@@ -10,7 +10,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { tasks, existingGroups, maxGroups } = await req.json();
+    const { tasks, existingGroups, maxGroups, instructions } = await req.json();
+    const userInstructions =
+      typeof instructions === "string" ? instructions.trim().slice(0, 1000) : "";
     if (!Array.isArray(tasks) || tasks.length === 0) {
       return new Response(JSON.stringify({ groups: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -39,7 +41,11 @@ You MUST respond by calling the group_tasks tool. Rules:
 - Every input task id MUST appear in exactly ONE group. Do not invent ids. Do not drop any ids. Count the input ids and verify your output has the same count.
 - If there are only 1-3 tasks total and they clearly belong to different themes, use one group per theme. If they're all related, use a single group.
 - Order groups roughly by size (largest first).
-- Within each group, preserve the order the tasks were given.`;
+- Within each group, preserve the order the tasks were given.${userInstructions ? `
+
+USER DIRECTIONS (highest priority — these override the rules above when they conflict):
+"""${userInstructions}"""
+If the user asks for a group about a keyword/topic (e.g. "create a group for SQE"), put EVERY task mentioning that keyword (case-insensitive, including acronyms or close variants) into that group, and give it a short, related title (e.g. "SQE Enhancements"). Group the remaining tasks normally.` : ""}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

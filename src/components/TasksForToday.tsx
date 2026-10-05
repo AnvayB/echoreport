@@ -36,6 +36,8 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
+  const [regroupOpen, setRegroupOpen] = useState(false);
+  const [regroupPrompt, setRegroupPrompt] = useState("");
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
