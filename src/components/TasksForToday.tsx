@@ -36,6 +36,8 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
+  const [regroupOpen, setRegroupOpen] = useState(false);
+  const [regroupPrompt, setRegroupPrompt] = useState("");
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
@@ -522,16 +524,46 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           >
             <Dices className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={regroupAll}
-            disabled={loading || adding || regroupingAll || pending.length === 0}
-            aria-label="Consolidate topics"
-            title="Consolidate topics into fewer, broader groups"
-            className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            <Layers className={`h-4 w-4 ${regroupingAll ? "animate-pulse" : ""}`} />
-          </button>
+          <Popover open={regroupOpen} onOpenChange={setRegroupOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={loading || adding || regroupingAll || pending.length === 0}
+                aria-label="Regroup topics"
+                title="Regroup topics (optionally with instructions)"
+                className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <Layers className={`h-4 w-4 ${regroupingAll ? "animate-pulse" : ""}`} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-3 space-y-2">
+              <p className="text-sm font-medium">Regroup topics</p>
+              <Textarea
+                value={regroupPrompt}
+                onChange={(e) => setRegroupPrompt(e.target.value)}
+                placeholder='Optional, e.g. "Create a group for SQE"'
+                className="min-h-[70px] text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    setRegroupOpen(false);
+                    regroupAll(regroupPrompt);
+                  }
+                }}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setRegroupOpen(false);
+                    regroupAll(regroupPrompt);
+                  }}
+                >
+                  Regroup
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <button
             type="button"
             onClick={reload}
