@@ -771,7 +771,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         </DialogContent>
       </Dialog>
       <Dialog open={backlogBoardOpen} onOpenChange={setBacklogBoardOpen}>
-        <DialogContent className="inset-0 left-0 top-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:rounded-none">
+        <DialogContent className="inset-0 left-0 top-0 grid h-dvh w-screen max-w-none grid-rows-[auto_minmax(0,1fr)] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:rounded-none">
           <DialogHeader className="border-b bg-card px-5 py-3 pr-14 text-left sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <DialogTitle className="flex items-center gap-2">
               <ListTodo className="h-5 w-5" /> Backlog
@@ -789,7 +789,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               Expanded backlog with task groups arranged across the screen.
             </DialogDescription>
           </DialogHeader>
-          <div className="h-full overflow-y-auto bg-muted/30 p-4 sm:p-5">
+          <div className="min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5">
             {pendingByBucket.backlog && pendingByBucket.backlog.length > 0 ? (
               renderBacklogGroups(pendingByBucket.backlog, true)
             ) : (
