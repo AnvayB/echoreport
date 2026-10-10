@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -42,6 +42,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
+  const [backlogBoardOpen, setBacklogBoardOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [diceOpen, setDiceOpen] = useState(false);
@@ -230,6 +231,117 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     );
   };
 
+  const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
+    <div className={expanded ? "columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4" : "space-y-3"}>
+      {groups.map((g, gi) => {
+        const titleKey = `backlog:${gi}`;
+        const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
+        const isEditingTitle = editingGroupTitle === titleKey;
+        const isGroupOver = dragOverGroupKey === titleKey;
+        return (
+          <div
+            key={`${g.title}:${gi}`}
+            onDragOver={(e) => {
+              if (!draggingId) return;
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = "move";
+              if (dragOverGroupKey !== titleKey) setDragOverGroupKey(titleKey);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              if (dragOverGroupKey === titleKey) setDragOverGroupKey(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const id = e.dataTransfer.getData("text/plain");
+              const row = pending.find((r) => r.id === id);
+              setDragOverGroupKey(null);
+              setDragOverBucket(null);
+              setDraggingId(null);
+              if (row) moveTaskToGroup(row, g.title);
+            }}
+            className={`${expanded ? "mb-4 break-inside-avoid rounded-md border bg-card p-3 shadow-sm" : "pl-1 rounded-md"} transition-colors ${isGroupOver ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
+          >
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div>
+                  {isEditingTitle ? (
+                    <input
+                      autoFocus
+                      value={editingGroupText}
+                      onChange={(e) => setEditingGroupText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
+                          setEditingGroupTitle(null);
+                        } else if (e.key === "Escape") {
+                          setEditingGroupTitle(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
+                        setEditingGroupTitle(null);
+                      }}
+                      className="mb-2 w-full border-b border-muted-foreground/40 bg-transparent text-xs font-medium uppercase text-muted-foreground outline-none"
+                    />
+                  ) : (
+                    <p className="mb-2 cursor-default text-xs font-medium uppercase text-muted-foreground">
+                      {displayTitle}
+                      <span className="ml-1.5 normal-case text-muted-foreground/70">({g.rows.length})</span>
+                    </p>
+                  )}
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => { setEditingGroupText(displayTitle); setEditingGroupTitle(titleKey); }}>
+                  Rename group
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+            <div className={expanded ? "max-h-[52vh] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
+              {g.rows.map(renderCheckboxRow)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderBoardBucketTarget = (bucket: Exclude<Bucket, "backlog">) => {
+    const isOver = dragOverBucket === bucket;
+    return (
+      <div
+        key={bucket}
+        onDragOver={(e) => {
+          if (!draggingId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          setDragOverBucket(bucket);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          if (dragOverBucket === bucket) setDragOverBucket(null);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData("text/plain");
+          const row = pending.find((item) => item.id === id);
+          setDragOverBucket(null);
+          setDragOverGroupKey(null);
+          setDraggingId(null);
+          if (row) moveTaskToBucket(row, bucket);
+        }}
+        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+          isOver ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground"
+        }`}
+      >
+        {bucketLabels[bucket]}
+      </div>
+    );
+  };
+
   const renderBucket = (bucket: Bucket, groups: TaskGroup[] | null) => {
     const isOver = dragOverBucket === bucket;
     const hasItems = !!groups && groups.length > 0;
@@ -262,21 +374,36 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         }`}
       >
         {bucket === "backlog" ? (
-          <button
-            type="button"
-            onClick={() => setBacklogOpen((o) => !o)}
-            className="w-full font-semibold text-sm text-foreground mb-2 flex items-center gap-2 hover:text-foreground/80 transition-colors"
-          >
-            <ChevronRight
-              className={`h-3.5 w-3.5 transition-transform duration-200 ${backlogOpen ? "rotate-90" : ""}`}
-            />
-            {bucketLabels[bucket]}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setBacklogOpen((o) => !o)}
+              className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-foreground/80"
+            >
+              <ChevronRight
+                className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${backlogOpen ? "rotate-90" : ""}`}
+              />
+              {bucketLabels[bucket]}
+              {hasItems && (
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({groups!.reduce((n, g) => n + g.rows.length, 0)})
+                </span>
+              )}
+            </button>
             {hasItems && (
-              <span className="text-xs font-normal text-muted-foreground">
-                ({groups!.reduce((n, g) => n + g.rows.length, 0)})
-              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setBacklogBoardOpen(true)}
+                aria-label="Open expanded backlog"
+                title="Open expanded backlog"
+                className="h-7 w-7 shrink-0"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </Button>
             )}
-          </button>
+          </div>
         ) : (
           <p className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
             {bucketLabels[bucket]}
@@ -295,81 +422,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
         ) : bucket === "backlog" ? (
-          <div className="space-y-3">
-            {groups!.map((g, gi) => {
-              const titleKey = `${bucket}:${gi}`;
-              const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
-              const isEditingTitle = editingGroupTitle === titleKey;
-              const isGroupOver = dragOverGroupKey === titleKey;
-              return (
-                <div
-                  key={gi}
-                  onDragOver={(e) => {
-                    if (!draggingId) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.dataTransfer.dropEffect = "move";
-                    if (dragOverGroupKey !== titleKey) setDragOverGroupKey(titleKey);
-                  }}
-                  onDragLeave={(e) => {
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    if (dragOverGroupKey === titleKey) setDragOverGroupKey(null);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const id = e.dataTransfer.getData("text/plain");
-                    const row = pending.find((r) => r.id === id);
-                    setDragOverGroupKey(null);
-                    setDragOverBucket(null);
-                    setDraggingId(null);
-                    if (row) moveTaskToGroup(row, g.title);
-                  }}
-                  className={`pl-1 rounded-md transition-colors ${isGroupOver ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
-                >
-                  <ContextMenu>
-                    <ContextMenuTrigger asChild>
-                      <div>
-                        {isEditingTitle ? (
-                          <input
-                            autoFocus
-                            value={editingGroupText}
-                            onChange={(e) => setEditingGroupText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
-                                setEditingGroupTitle(null);
-                              } else if (e.key === "Escape") {
-                                setEditingGroupTitle(null);
-                              }
-                            }}
-                            onBlur={() => {
-                              if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
-                              setEditingGroupTitle(null);
-                            }}
-                            className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 bg-transparent border-b border-muted-foreground/40 outline-none w-full"
-                          />
-                        ) : (
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 cursor-default">
-                            {displayTitle}
-                            <span className="ml-1.5 normal-case tracking-normal text-muted-foreground/70">
-                              ({g.rows.length})
-                            </span>
-                          </p>
-                        )}
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem onSelect={() => { setEditingGroupText(displayTitle); setEditingGroupTitle(titleKey); }}>
-                        Rename group
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                  <div className="space-y-1.5">{g.rows.map(renderCheckboxRow)}</div>
-                </div>
-              );
-            })}
-          </div>
+          renderBacklogGroups(groups!)
         ) : (
           <div className="space-y-1.5">
             {groups!.flatMap((g) => g.rows).map(renderCheckboxRow)}
@@ -715,6 +768,34 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               Let's do it
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={backlogBoardOpen} onOpenChange={setBacklogBoardOpen}>
+        <DialogContent className="inset-0 left-0 top-0 grid h-dvh w-screen max-w-none grid-rows-[auto_minmax(0,1fr)] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:rounded-none">
+          <DialogHeader className="border-b bg-card px-5 py-3 pr-14 text-left sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <DialogTitle className="flex items-center gap-2">
+              <ListTodo className="h-5 w-5" /> Backlog
+              <span className="text-sm font-normal text-muted-foreground">
+                ({pendingByBucket.backlog?.reduce((total, group) => total + group.rows.length, 0) ?? 0})
+              </span>
+            </DialogTitle>
+            <div className="flex flex-wrap items-center gap-2" aria-label="Move task to schedule">
+              <span className="text-xs text-muted-foreground">Drop task into</span>
+              {renderBoardBucketTarget("today")}
+              {renderBoardBucketTarget("tomorrow")}
+              {renderBoardBucketTarget("thisWeek")}
+            </div>
+            <DialogDescription className="sr-only">
+              Expanded backlog with task groups arranged across the screen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5">
+            {pendingByBucket.backlog && pendingByBucket.backlog.length > 0 ? (
+              renderBacklogGroups(pendingByBucket.backlog, true)
+            ) : (
+              <p className="text-sm italic text-muted-foreground">No backlog tasks.</p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </Card>
