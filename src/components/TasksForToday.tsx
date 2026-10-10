@@ -309,6 +309,39 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     </div>
   );
 
+  const renderBoardBucketTarget = (bucket: Exclude<Bucket, "backlog">) => {
+    const isOver = dragOverBucket === bucket;
+    return (
+      <div
+        key={bucket}
+        onDragOver={(e) => {
+          if (!draggingId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          setDragOverBucket(bucket);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          if (dragOverBucket === bucket) setDragOverBucket(null);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData("text/plain");
+          const row = pending.find((item) => item.id === id);
+          setDragOverBucket(null);
+          setDragOverGroupKey(null);
+          setDraggingId(null);
+          if (row) moveTaskToBucket(row, bucket);
+        }}
+        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+          isOver ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground"
+        }`}
+      >
+        {bucketLabels[bucket]}
+      </div>
+    );
+  };
+
   const renderBucket = (bucket: Bucket, groups: TaskGroup[] | null) => {
     const isOver = dragOverBucket === bucket;
     const hasItems = !!groups && groups.length > 0;
@@ -739,13 +772,19 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       </Dialog>
       <Dialog open={backlogBoardOpen} onOpenChange={setBacklogBoardOpen}>
         <DialogContent className="inset-0 left-0 top-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:rounded-none">
-          <DialogHeader className="border-b bg-card px-5 py-4 pr-14 text-left">
+          <DialogHeader className="border-b bg-card px-5 py-3 pr-14 text-left sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <DialogTitle className="flex items-center gap-2">
               <ListTodo className="h-5 w-5" /> Backlog
               <span className="text-sm font-normal text-muted-foreground">
                 ({pendingByBucket.backlog?.reduce((total, group) => total + group.rows.length, 0) ?? 0})
               </span>
             </DialogTitle>
+            <div className="flex flex-wrap items-center gap-2" aria-label="Move task to schedule">
+              <span className="text-xs text-muted-foreground">Drop task into</span>
+              {renderBoardBucketTarget("today")}
+              {renderBoardBucketTarget("tomorrow")}
+              {renderBoardBucketTarget("thisWeek")}
+            </div>
             <DialogDescription className="sr-only">
               Expanded backlog with task groups arranged across the screen.
             </DialogDescription>
