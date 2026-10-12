@@ -231,8 +231,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     );
   };
 
+  // Panels only; the masonry/columns wrapper lives at the call site when expanded.
   const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
-    <div className={expanded ? "columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4" : "space-y-3"}>
+    <div className={expanded ? "contents" : "space-y-3"}>
       {groups.map((g, gi) => {
         const titleKey = `backlog:${gi}`;
         const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
