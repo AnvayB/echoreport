@@ -310,6 +310,53 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     </div>
   );
 
+  // "Today" panel shown as the first column of the expanded backlog board.
+  const renderBoardTodayPanel = () => {
+    const todayRows = (pendingByBucket.today ?? []).flatMap((g) => g.rows);
+    const todayKey = "board:today";
+    const isOver = dragOverGroupKey === todayKey;
+    return (
+      <div
+        onDragOver={(e) => {
+          if (!draggingId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (dragOverGroupKey !== todayKey) setDragOverGroupKey(todayKey);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          if (dragOverGroupKey === todayKey) setDragOverGroupKey(null);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData("text/plain");
+          const row = pending.find((r) => r.id === id);
+          setDragOverGroupKey(null);
+          setDragOverBucket(null);
+          setDraggingId(null);
+          if (row) moveTaskToBucket(row, "today");
+        }}
+        className={`mb-4 break-inside-avoid rounded-md border p-3 shadow-sm transition-colors ${
+          isOver ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-primary/40 bg-primary/5"
+        }`}
+      >
+        <p className="mb-2 text-xs font-medium uppercase text-primary">
+          Today
+          <span className="ml-1.5 normal-case text-primary/70">({todayRows.length})</span>
+        </p>
+        {todayRows.length === 0 ? (
+          <p className="text-xs italic text-muted-foreground py-1">
+            {isOver ? "Drop here" : "Drag tasks here"}
+          </p>
+        ) : (
+          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+            {todayRows.map(renderCheckboxRow)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderBoardBucketTarget = (bucket: Exclude<Bucket, "backlog">) => {
     const isOver = dragOverBucket === bucket;
     return (
