@@ -838,11 +838,21 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5">
-            {pendingByBucket.backlog && pendingByBucket.backlog.length > 0 ? (
-              renderBacklogGroups(pendingByBucket.backlog, true)
-            ) : (
-              <p className="text-sm italic text-muted-foreground">No backlog tasks.</p>
-            )}
+            {(() => {
+              const backlogGroups = pendingByBucket.backlog ?? [];
+              const todayRows = pendingByBucket.today ?? [];
+              const hasAnything =
+                backlogGroups.length > 0 || todayRows.some((g) => g.rows.length > 0);
+              if (!hasAnything) {
+                return <p className="text-sm italic text-muted-foreground">No tasks yet.</p>;
+              }
+              return (
+                <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
+                  {renderBoardTodayPanel()}
+                  {renderBacklogGroups(backlogGroups, true)}
+                </div>
+              );
+            })()}
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-4">
             <div className="pointer-events-auto w-full max-w-2xl rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
