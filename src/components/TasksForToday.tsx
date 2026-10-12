@@ -231,8 +231,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     );
   };
 
+  // Panels only; the masonry/columns wrapper lives at the call site when expanded.
   const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
-    <div className={expanded ? "columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4" : "space-y-3"}>
+    <div className={expanded ? "contents" : "space-y-3"}>
       {groups.map((g, gi) => {
         const titleKey = `backlog:${gi}`;
         const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
@@ -308,6 +309,53 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       })}
     </div>
   );
+
+  // "Today" panel shown as the first column of the expanded backlog board.
+  const renderBoardTodayPanel = () => {
+    const todayRows = (pendingByBucket.today ?? []).flatMap((g) => g.rows);
+    const todayKey = "board:today";
+    const isOver = dragOverGroupKey === todayKey;
+    return (
+      <div
+        onDragOver={(e) => {
+          if (!draggingId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (dragOverGroupKey !== todayKey) setDragOverGroupKey(todayKey);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          if (dragOverGroupKey === todayKey) setDragOverGroupKey(null);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData("text/plain");
+          const row = pending.find((r) => r.id === id);
+          setDragOverGroupKey(null);
+          setDragOverBucket(null);
+          setDraggingId(null);
+          if (row) moveTaskToBucket(row, "today");
+        }}
+        className={`mb-4 break-inside-avoid rounded-md border p-3 shadow-sm transition-colors ${
+          isOver ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-primary/40 bg-primary/5"
+        }`}
+      >
+        <p className="mb-2 text-xs font-medium uppercase text-primary">
+          Today
+          <span className="ml-1.5 normal-case text-primary/70">({todayRows.length})</span>
+        </p>
+        {todayRows.length === 0 ? (
+          <p className="text-xs italic text-muted-foreground py-1">
+            {isOver ? "Drop here" : "Drag tasks here"}
+          </p>
+        ) : (
+          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+            {todayRows.map(renderCheckboxRow)}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderBoardBucketTarget = (bucket: Exclude<Bucket, "backlog">) => {
     const isOver = dragOverBucket === bucket;
@@ -790,11 +838,21 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5">
-            {pendingByBucket.backlog && pendingByBucket.backlog.length > 0 ? (
-              renderBacklogGroups(pendingByBucket.backlog, true)
-            ) : (
-              <p className="text-sm italic text-muted-foreground">No backlog tasks.</p>
-            )}
+            {(() => {
+              const backlogGroups = pendingByBucket.backlog ?? [];
+              const todayRows = pendingByBucket.today ?? [];
+              const hasAnything =
+                backlogGroups.length > 0 || todayRows.some((g) => g.rows.length > 0);
+              if (!hasAnything) {
+                return <p className="text-sm italic text-muted-foreground">No tasks yet.</p>;
+              }
+              return (
+                <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
+                  {renderBoardTodayPanel()}
+                  {renderBacklogGroups(backlogGroups, true)}
+                </div>
+              );
+            })()}
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-4">
             <div className="pointer-events-auto w-full max-w-2xl rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
