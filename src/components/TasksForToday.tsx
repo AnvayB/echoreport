@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -43,6 +43,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [backlogBoardOpen, setBacklogBoardOpen] = useState(false);
+  const [addBarMinimized, setAddBarMinimized] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [diceOpen, setDiceOpen] = useState(false);
@@ -837,7 +838,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               Expanded backlog with task groups arranged across the screen.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5">
+          <div className={`min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}>
             {(() => {
               const backlogGroups = pendingByBucket.backlog ?? [];
               const todayRows = pendingByBucket.today ?? [];
