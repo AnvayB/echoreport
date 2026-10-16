@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -43,6 +43,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [backlogBoardOpen, setBacklogBoardOpen] = useState(false);
+  const [addBarMinimized, setAddBarMinimized] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [diceOpen, setDiceOpen] = useState(false);
@@ -837,7 +838,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               Expanded backlog with task groups arranged across the screen.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5">
+          <div className={`min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}>
             {(() => {
               const backlogGroups = pendingByBucket.backlog ?? [];
               const todayRows = pendingByBucket.today ?? [];
@@ -855,36 +856,62 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             })()}
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-4">
-            <div className="pointer-events-auto w-full max-w-2xl rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Add More Tasks
-                </label>
-                <VoiceInput
-                  onTranscript={(t) => setNewTasksText((prev) => (prev ? prev + " " + t : t))}
-                  onInterimTranscript={setInterimVoiceText}
+            {addBarMinimized ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="pointer-events-auto h-9 rounded-full bg-card/95 shadow-lg backdrop-blur"
+                onClick={() => setAddBarMinimized(false)}
+                title="Expand Add More Tasks"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add More Tasks
+                <ChevronUp className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            ) : (
+              <div className="pointer-events-auto w-full max-w-2xl rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Plus className="h-3.5 w-3.5" /> Add More Tasks
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <VoiceInput
+                      onTranscript={(t) => setNewTasksText((prev) => (prev ? prev + " " + t : t))}
+                      onInterimTranscript={setInterimVoiceText}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => setAddBarMinimized(true)}
+                      title="Minimize Add More Tasks"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  value={newTasksText}
+                  onChange={(e) => setNewTasksText(e.target.value)}
+                  placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
+                  className="min-h-[40px] focus:min-h-[72px] transition-[min-height] text-sm"
+                  disabled={adding}
                 />
+                {interimVoiceText && (
+                  <p className="text-xs text-muted-foreground italic px-1 mt-1">{interimVoiceText}</p>
+                )}
+                <div className="flex justify-end mt-2">
+                  <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
+                    {adding ? (
+                      <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Parsing…</>
+                    ) : (
+                      <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks</>
+                    )}
+                  </Button>
+                </div>
               </div>
-              <Textarea
-                value={newTasksText}
-                onChange={(e) => setNewTasksText(e.target.value)}
-                placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
-                className="min-h-[40px] focus:min-h-[72px] transition-[min-height] text-sm"
-                disabled={adding}
-              />
-              {interimVoiceText && (
-                <p className="text-xs text-muted-foreground italic px-1 mt-1">{interimVoiceText}</p>
-              )}
-              <div className="flex justify-end mt-2">
-                <Button onClick={addMoreTasks} size="sm" disabled={adding || !newTasksText.trim()}>
-                  {adding ? (
-                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Parsing…</>
-                  ) : (
-                    <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Add tasks</>
-                  )}
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
