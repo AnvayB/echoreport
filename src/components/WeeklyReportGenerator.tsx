@@ -41,6 +41,7 @@ const REPORT_SECTION_LABELS = [
 
 const normalizeWeeklyReport = (report: string) =>
   report
+    .replace(/```[a-z]*\n?/gi, "")
     .split("\n")
     .map((rawLine) => {
       // Dates are useful to the model for determining task state, but should not
