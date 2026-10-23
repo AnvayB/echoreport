@@ -451,6 +451,18 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
               <Button onClick={generate} variant="ghost" size="sm" disabled={loading}>
                 Regenerate
               </Button>
+              <Button
+                onClick={() => setEditing((v) => !v)}
+                variant="ghost"
+                size="sm"
+                disabled={!draft || loading}
+              >
+                {editing ? (
+                  <><Eye className="mr-2 h-4 w-4" /> Preview</>
+                ) : (
+                  <><Pencil className="mr-2 h-4 w-4" /> Edit</>
+                )}
+              </Button>
             </div>
             <Button onClick={copyToClipboard} disabled={!draft || loading} size="sm">
               <Copy className="mr-2 h-4 w-4" /> Copy
