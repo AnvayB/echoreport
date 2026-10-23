@@ -413,7 +413,25 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!loading && draft && (
+          {!loading && draft && !editing && (
+            <div className="rounded-md border bg-card p-4 max-h-[420px] overflow-y-auto">
+              {(() => {
+                const { subject, body } = splitSubject(draft);
+                return (
+                  <>
+                    <p className="mb-3 text-sm font-semibold">Subject: {subject}</p>
+                    <div
+                      className="text-sm [&_ul]:list-disc [&_ol]:list-decimal"
+                      // markdownToEmailHtml escapes all source text and only reintroduces
+                      // whitelisted b/i/u/p/ul/ol/li tags, so this is safe to render.
+                      dangerouslySetInnerHTML={{ __html: markdownToEmailHtml(body) }}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          )}
+          {!loading && draft && editing && (
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
