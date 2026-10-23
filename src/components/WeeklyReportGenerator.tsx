@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
 import { dedupeTaskRows } from "@/lib/taskUtils";
-import { Loader2, FileText, Copy, Download, Mail } from "lucide-react";
+import { Loader2, FileText, Copy, Download, Mail, Pencil, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 // Plain-text fallback (strip bold/italic/underline/heading/code-fence markers) for
@@ -41,6 +41,7 @@ const REPORT_SECTION_LABELS = [
 
 const normalizeWeeklyReport = (report: string) =>
   report
+    .replace(/```[a-z]*\n?/gi, "")
     .split("\n")
     .map((rawLine) => {
       // Dates are useful to the model for determining task state, but should not
@@ -142,6 +143,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   const [loading, setLoading] = useState(false);
   
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
@@ -289,9 +291,36 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     if (!draft) await generate();
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(draft);
-    toast.success("Copied to clipboard");
+  // Copies the report as real HTML (with a plain-text fallback) so pasting into
+  // Outlook or any other mail client keeps bold/underline/bullets.
+  const copyRichToClipboard = async (markdown: string): Promise<"rich" | "plain" | "failed"> => {
+    const html = markdownToEmailHtml(markdown);
+    const plain = toPlainText(markdown);
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plain], { type: "text/plain" }),
+        }),
+      ]);
+      return "rich";
+    } catch (e) {
+      console.warn("Rich clipboard copy failed, falling back to plain text", e);
+    }
+    try {
+      await navigator.clipboard.writeText(plain);
+      return "plain";
+    } catch (e) {
+      console.warn("Plain clipboard copy failed", e);
+      return "failed";
+    }
+  };
+
+  const copyToClipboard = async () => {
+    const result = await copyRichToClipboard(draft);
+    if (result === "rich") toast.success("Copied with formatting — paste anywhere");
+    else if (result === "plain") toast.success("Copied as plain text");
+    else toast.error("Couldn't copy to clipboard");
   };
 
   const downloadMarkdown = () => {
@@ -307,54 +336,41 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     toast.success("Downloaded");
   };
 
-  const openInOutlook = async () => {
-    const lines = draft.split("\n");
+  const splitSubject = (text: string) => {
+    const lines = text.split("\n");
     const subjectIdx = lines.findIndex((l) => /^\s*subject\s*:/i.test(l));
     const subject =
       subjectIdx >= 0
         ? lines[subjectIdx].replace(/^\s*subject\s*:\s*/i, "").trim()
         : `Weekly Report — ${formatWeekLabel(currentWeek)}`;
     const body = (subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines).join("\n").trim();
+    return { subject, body };
+  };
 
-    // Open synchronously from the click so browsers do not block the tab while the
-    // clipboard operation is running.
-    const outlookWindow = window.open("about:blank", "_blank");
-    if (outlookWindow) outlookWindow.opener = null;
+  const openInOutlook = () => {
+    const { subject, body } = splitSubject(draft);
+
+    // Open the real Outlook compose URL synchronously from the click — opening a
+    // blank tab first and redirecting it later gets blocked by popup blockers.
+    const url =
+      "https://outlook.office.com/mail/deeplink/compose?subject=" + encodeURIComponent(subject);
+    const outlookWindow = window.open(url, "_blank", "noopener,noreferrer");
 
     // Outlook's compose deeplink only accepts a plain-text body, so the reliable way
     // to land styled (bold/underline/bulleted) content in the email is to put real
     // HTML on the clipboard and have the user paste it into the empty draft.
-    let styledCopySucceeded = false;
-    try {
-      const html = markdownToEmailHtml(body);
-      const plain = toPlainText(body);
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plain], { type: "text/plain" }),
-        }),
-      ]);
-      styledCopySucceeded = true;
-    } catch (e) {
-      console.warn("Rich clipboard copy failed, falling back to plain text", e);
-    }
+    void copyRichToClipboard(body).then((result) => {
+      if (result === "rich") {
+        toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
+      } else if (result === "plain") {
+        toast.success("Copied as plain text — paste it (Ctrl/Cmd+V) into the email body");
+      } else {
+        toast.error("Couldn't copy the report — use the Copy button, then paste into Outlook");
+      }
+    });
 
-    const url = styledCopySucceeded
-      ? "https://outlook.office.com/mail/deeplink/compose?subject=" + encodeURIComponent(subject)
-      : "https://outlook.office.com/mail/deeplink/compose?subject=" +
-        encodeURIComponent(subject) +
-        "&body=" +
-        encodeURIComponent(toPlainText(body));
-    if (outlookWindow) {
-      outlookWindow.location.href = url;
-    } else {
-      window.location.href = url;
-    }
-
-    if (styledCopySucceeded) {
-      toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
-    } else {
-      toast.error("Couldn't copy styled formatting — opened with plain text instead");
+    if (!outlookWindow) {
+      toast.error("Your browser blocked the Outlook tab — allow popups for this site and try again");
     }
   };
 
@@ -397,7 +413,25 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!loading && draft && (
+          {!loading && draft && !editing && (
+            <div className="rounded-md border bg-card p-4 max-h-[420px] overflow-y-auto">
+              {(() => {
+                const { subject, body } = splitSubject(draft);
+                return (
+                  <>
+                    <p className="mb-3 text-sm font-semibold">Subject: {subject}</p>
+                    <div
+                      className="text-sm [&_ul]:list-disc [&_ol]:list-decimal"
+                      // markdownToEmailHtml escapes all source text and only reintroduces
+                      // whitelisted b/i/u/p/ul/ol/li tags, so this is safe to render.
+                      dangerouslySetInnerHTML={{ __html: markdownToEmailHtml(body) }}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          )}
+          {!loading && draft && editing && (
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -416,6 +450,18 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
               </Button>
               <Button onClick={generate} variant="ghost" size="sm" disabled={loading}>
                 Regenerate
+              </Button>
+              <Button
+                onClick={() => setEditing((v) => !v)}
+                variant="ghost"
+                size="sm"
+                disabled={!draft || loading}
+              >
+                {editing ? (
+                  <><Eye className="mr-2 h-4 w-4" /> Preview</>
+                ) : (
+                  <><Pencil className="mr-2 h-4 w-4" /> Edit</>
+                )}
               </Button>
             </div>
             <Button onClick={copyToClipboard} disabled={!draft || loading} size="sm">
