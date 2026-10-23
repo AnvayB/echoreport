@@ -289,9 +289,36 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     if (!draft) await generate();
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(draft);
-    toast.success("Copied to clipboard");
+  // Copies the report as real HTML (with a plain-text fallback) so pasting into
+  // Outlook or any other mail client keeps bold/underline/bullets.
+  const copyRichToClipboard = async (markdown: string): Promise<"rich" | "plain" | "failed"> => {
+    const html = markdownToEmailHtml(markdown);
+    const plain = toPlainText(markdown);
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plain], { type: "text/plain" }),
+        }),
+      ]);
+      return "rich";
+    } catch (e) {
+      console.warn("Rich clipboard copy failed, falling back to plain text", e);
+    }
+    try {
+      await navigator.clipboard.writeText(plain);
+      return "plain";
+    } catch (e) {
+      console.warn("Plain clipboard copy failed", e);
+      return "failed";
+    }
+  };
+
+  const copyToClipboard = async () => {
+    const result = await copyRichToClipboard(draft);
+    if (result === "rich") toast.success("Copied with formatting — paste anywhere");
+    else if (result === "plain") toast.success("Copied as plain text");
+    else toast.error("Couldn't copy to clipboard");
   };
 
   const downloadMarkdown = () => {
