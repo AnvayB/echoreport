@@ -334,54 +334,41 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
     toast.success("Downloaded");
   };
 
-  const openInOutlook = async () => {
-    const lines = draft.split("\n");
+  const splitSubject = (text: string) => {
+    const lines = text.split("\n");
     const subjectIdx = lines.findIndex((l) => /^\s*subject\s*:/i.test(l));
     const subject =
       subjectIdx >= 0
         ? lines[subjectIdx].replace(/^\s*subject\s*:\s*/i, "").trim()
         : `Weekly Report — ${formatWeekLabel(currentWeek)}`;
     const body = (subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines).join("\n").trim();
+    return { subject, body };
+  };
 
-    // Open synchronously from the click so browsers do not block the tab while the
-    // clipboard operation is running.
-    const outlookWindow = window.open("about:blank", "_blank");
-    if (outlookWindow) outlookWindow.opener = null;
+  const openInOutlook = () => {
+    const { subject, body } = splitSubject(draft);
+
+    // Open the real Outlook compose URL synchronously from the click — opening a
+    // blank tab first and redirecting it later gets blocked by popup blockers.
+    const url =
+      "https://outlook.office.com/mail/deeplink/compose?subject=" + encodeURIComponent(subject);
+    const outlookWindow = window.open(url, "_blank", "noopener,noreferrer");
 
     // Outlook's compose deeplink only accepts a plain-text body, so the reliable way
     // to land styled (bold/underline/bulleted) content in the email is to put real
     // HTML on the clipboard and have the user paste it into the empty draft.
-    let styledCopySucceeded = false;
-    try {
-      const html = markdownToEmailHtml(body);
-      const plain = toPlainText(body);
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plain], { type: "text/plain" }),
-        }),
-      ]);
-      styledCopySucceeded = true;
-    } catch (e) {
-      console.warn("Rich clipboard copy failed, falling back to plain text", e);
-    }
+    void copyRichToClipboard(body).then((result) => {
+      if (result === "rich") {
+        toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
+      } else if (result === "plain") {
+        toast.success("Copied as plain text — paste it (Ctrl/Cmd+V) into the email body");
+      } else {
+        toast.error("Couldn't copy the report — use the Copy button, then paste into Outlook");
+      }
+    });
 
-    const url = styledCopySucceeded
-      ? "https://outlook.office.com/mail/deeplink/compose?subject=" + encodeURIComponent(subject)
-      : "https://outlook.office.com/mail/deeplink/compose?subject=" +
-        encodeURIComponent(subject) +
-        "&body=" +
-        encodeURIComponent(toPlainText(body));
-    if (outlookWindow) {
-      outlookWindow.location.href = url;
-    } else {
-      window.location.href = url;
-    }
-
-    if (styledCopySucceeded) {
-      toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
-    } else {
-      toast.error("Couldn't copy styled formatting — opened with plain text instead");
+    if (!outlookWindow) {
+      toast.error("Your browser blocked the Outlook tab — allow popups for this site and try again");
     }
   };
 
