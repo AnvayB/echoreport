@@ -61,6 +61,11 @@ export interface TasksForTodayContextValue {
   deleteTask: (row: TaskRow) => Promise<void>;
   moveTaskToBucket: (row: TaskRow, bucket: Bucket) => Promise<void>;
   moveTaskToGroup: (row: TaskRow, groupTitle: string) => Promise<void>;
+  // Manually created empty backlog groups (persisted separately from tasks).
+  backlogCustomGroups: string[];
+  createBacklogGroup: (title: string) => Promise<boolean>;
+  renameBacklogGroup: (oldTitle: string, newTitle: string) => Promise<boolean>;
+  deleteBacklogGroup: (title: string) => Promise<void>;
   addMoreTasks: () => Promise<void>;
   reload: () => Promise<void>;
 }
