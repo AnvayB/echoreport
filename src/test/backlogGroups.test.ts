@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeBacklogGroups } from "@/lib/backlogGroups";
+import { canCreateGroupOnDrop, mergeBacklogGroups, nextBacklogGroupTitle } from "@/lib/backlogGroups";
 import type { TaskGroup } from "@/components/TasksForTodayContext";
 
 const group = (title: string, count: number): TaskGroup => ({
@@ -37,5 +37,20 @@ describe("mergeBacklogGroups", () => {
     const merged = mergeBacklogGroups(taskGroups, ["C"]);
     expect(merged[0]).toEqual(taskGroups[0]);
     expect(merged[1]).toEqual(taskGroups[1]);
+  });
+});
+
+describe("expanded backlog empty-space drops", () => {
+  it("creates a new group only in expanded view", () => {
+    expect(canCreateGroupOnDrop(true, "task-1", false)).toBe(true);
+    expect(canCreateGroupOnDrop(false, "task-1", false)).toBe(false);
+  });
+  it("does not create groups over existing drop targets", () => {
+    expect(canCreateGroupOnDrop(true, "task-1", true)).toBe(false);
+    expect(canCreateGroupOnDrop(true, null, false)).toBe(false);
+  });
+  it("chooses a distinct title for each new group", () => {
+    expect(nextBacklogGroupTitle([])).toBe("New Group");
+    expect(nextBacklogGroupTitle(["new group", "New Group 2"])).toBe("New Group 3");
   });
 });
