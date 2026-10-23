@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +18,7 @@ import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./T
 import { isTaskImportant } from "@/lib/taskUtils";
 import TaskText from "./TaskText";
 import VoiceInput from "./VoiceInput";
+import { canCreateGroupOnDrop, nextBacklogGroupTitle } from "@/lib/backlogGroups";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
@@ -41,6 +42,8 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [regroupPrompt, setRegroupPrompt] = useState("");
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [newGroupDropVisible, setNewGroupDropVisible] = useState(false);
+  const newGroupDropRef = useRef<HTMLDivElement>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
@@ -134,6 +137,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             }}
             onDragEnd={() => {
               setDraggingId(null);
+              setNewGroupDropVisible(false);
               setDragOverBucket(null);
               setDragOverGroupKey(null);
             }}
@@ -285,7 +289,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
     <div className={expanded ? "contents" : "space-y-3"}>
       {groups.map((g, gi) => {
-        const titleKey = `backlog:${gi}`;
+        const titleKey = `backlog:${g.title}`;
         const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
         const isEditingTitle = editingGroupTitle === titleKey;
         const isGroupOver = dragOverGroupKey === titleKey;
@@ -295,12 +299,13 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         const commitRename = () => {
           const t = editingGroupText.trim();
           if (!t) return;
-          if (isCustomEmpty) renameBacklogGroup(g.title, t);
+          if (isCustomEmpty || g.rows.some((row) => row.group_title === g.title)) renameBacklogGroup(g.title, t);
           else setGroupTitleOverrides((o) => ({ ...o, [titleKey]: t }));
         };
         return (
           <div
             key={`${g.title}:${gi}`}
+            data-board-drop-target={expanded ? "group" : undefined}
             onDragOver={(e) => {
               if (!draggingId) return;
               e.preventDefault();
@@ -387,6 +392,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     const isOver = dragOverGroupKey === todayKey;
     return (
       <div
+        data-board-drop-target="today"
         onDragOver={(e) => {
           if (!draggingId) return;
           e.preventDefault();
@@ -889,7 +895,10 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={backlogBoardOpen} onOpenChange={setBacklogBoardOpen}>
+      <Dialog open={backlogBoardOpen} onOpenChange={(open) => {
+        setBacklogBoardOpen(open);
+        setNewGroupDropVisible(false);
+      }}>
         <DialogContent className="inset-0 left-0 top-0 grid h-dvh w-screen max-w-none grid-rows-[auto_minmax(0,1fr)] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:rounded-none">
           <DialogHeader className="border-b bg-card px-5 py-3 pr-14 text-left sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <DialogTitle className="flex items-center gap-2">
@@ -909,7 +918,47 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               Expanded backlog with task groups arranged across the screen.
             </DialogDescription>
           </DialogHeader>
-          <div className={`min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}>
+          <div
+            aria-label="Backlog board workspace"
+            onDragOverCapture={(e) => {
+              const overTarget = e.target instanceof Element && !!e.target.closest("[data-board-drop-target]");
+              const eligible = canCreateGroupOnDrop(backlogBoardOpen, draggingId, overTarget);
+              setNewGroupDropVisible(eligible);
+              if (!eligible) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setDragOverGroupKey(null);
+              setDragOverBucket(null);
+              if (newGroupDropRef.current) {
+                const bounds = e.currentTarget.getBoundingClientRect();
+                newGroupDropRef.current.style.left = `${Math.max(bounds.left + 8, Math.min(e.clientX - 100, bounds.right - 208))}px`;
+                newGroupDropRef.current.style.top = `${Math.max(bounds.top + 8, Math.min(e.clientY + 18, bounds.bottom - 56))}px`;
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setNewGroupDropVisible(false);
+            }}
+            onDrop={async (e) => {
+              const overTarget = e.target instanceof Element && !!e.target.closest("[data-board-drop-target]");
+              if (!canCreateGroupOnDrop(backlogBoardOpen, draggingId, overTarget)) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const id = e.dataTransfer.getData("text/plain");
+              const row = pending.find((task) => task.id === id);
+              setNewGroupDropVisible(false);
+              setDraggingId(null);
+              setDragOverGroupKey(null);
+              setDragOverBucket(null);
+              if (!row || row.completed) return;
+              const title = nextBacklogGroupTitle([
+                ...backlogCustomGroups,
+                ...(pendingByBucket.backlog ?? []).map((group) => group.title),
+                ...pending.flatMap((task) => task.group_title ? [task.group_title] : []),
+              ]);
+              await moveTaskToGroup(row, title);
+            }}
+            className={`min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
+          >
             {(() => {
               const backlogGroups = pendingByBucket.backlog ?? [];
               const todayRows = pendingByBucket.today ?? [];
@@ -925,6 +974,13 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 </div>
               );
             })()}
+          </div>
+          <div
+            ref={newGroupDropRef}
+            role="status"
+            className={`pointer-events-none fixed z-20 flex h-12 w-[200px] items-center justify-center gap-2 rounded-md border border-dashed border-primary/60 bg-primary/5 text-sm font-medium text-primary backdrop-blur-sm ${newGroupDropVisible ? "" : "hidden"}`}
+          >
+            <FolderPlus className="h-4 w-4 shrink-0" /> Add to New Group
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-4">
             {addBarMinimized ? (
