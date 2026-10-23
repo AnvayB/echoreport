@@ -334,14 +334,14 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                       onChange={(e) => setEditingGroupText(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
+                          commitRename();
                           setEditingGroupTitle(null);
                         } else if (e.key === "Escape") {
                           setEditingGroupTitle(null);
                         }
                       }}
                       onBlur={() => {
-                        if (editingGroupText.trim()) setGroupTitleOverrides((o) => ({ ...o, [titleKey]: editingGroupText.trim() }));
+                        commitRename();
                         setEditingGroupTitle(null);
                       }}
                       className="mb-2 w-full border-b border-muted-foreground/40 bg-transparent text-xs font-medium uppercase text-muted-foreground outline-none"
@@ -358,10 +358,21 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 <ContextMenuItem onSelect={() => { setEditingGroupText(displayTitle); setEditingGroupTitle(titleKey); }}>
                   Rename group
                 </ContextMenuItem>
+                {isCustomEmpty && (
+                  <ContextMenuItem onSelect={() => deleteBacklogGroup(g.title)}>
+                    <Trash2 className="h-3.5 w-3.5" /> Delete empty group
+                  </ContextMenuItem>
+                )}
               </ContextMenuContent>
             </ContextMenu>
             <div className={expanded ? "max-h-[52vh] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
-              {g.rows.map(renderCheckboxRow)}
+              {g.rows.length > 0 ? (
+                g.rows.map(renderCheckboxRow)
+              ) : (
+                <p className="py-1 text-xs italic text-muted-foreground">
+                  {isGroupOver ? "Drop here" : "Drop tasks here"}
+                </p>
+              )}
             </div>
           </div>
         );
@@ -497,6 +508,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 </span>
               )}
             </button>
+            {renderNewGroupButton()}
             {hasItems && (
               <Button
                 type="button"
@@ -891,6 +903,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               {renderBoardBucketTarget("today")}
               {renderBoardBucketTarget("tomorrow")}
               {renderBoardBucketTarget("thisWeek")}
+              {renderNewGroupButton()}
             </div>
             <DialogDescription className="sr-only">
               Expanded backlog with task groups arranged across the screen.
