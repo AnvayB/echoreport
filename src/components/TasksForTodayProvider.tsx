@@ -684,6 +684,24 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       toast.error("A group with that name already exists");
       return false;
     }
+    const groupRows = pending.filter((row) =>
+      bucketOf(row.task_date) === "backlog" && row.group_title === oldTitle
+    );
+    if (groupRows.length > 0) {
+      const { error } = await supabase.from("daily_tasks")
+        .update({ group_title: newTitle })
+        .eq("user_id", user.id)
+        .in("id", groupRows.map((row) => row.id));
+      if (error) {
+        toast.error("Couldn't rename group");
+        return false;
+      }
+      setPending((list) => list.map((row) =>
+        groupRows.some((groupRow) => groupRow.id === row.id)
+          ? { ...row, group_title: newTitle } : row
+      ));
+      return true;
+    }
     const prev = backlogCustomGroups;
     setBacklogCustomGroups((list) => list.map((t) => (t === oldTitle ? newTitle : t)));
     const { error } = await supabase
