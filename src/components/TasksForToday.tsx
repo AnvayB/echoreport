@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2, ChevronDown, ChevronUp,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2, ChevronDown, ChevronUp, FolderPlus, Trash2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -31,6 +31,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, moveTaskToGroup, addMoreTasks, reload, setTaskImportant, editTaskText,
+    backlogCustomGroups, createBacklogGroup, renameBacklogGroup, deleteBacklogGroup,
     isViewingToday, bucketLabels,
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
@@ -42,6 +43,8 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
   const [backlogBoardOpen, setBacklogBoardOpen] = useState(false);
   const [addBarMinimized, setAddBarMinimized] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -233,6 +236,52 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   };
 
   // Panels only; the masonry/columns wrapper lives at the call site when expanded.
+  const submitNewGroup = async () => {
+    const ok = await createBacklogGroup(newGroupName);
+    if (ok) {
+      setNewGroupName("");
+      setNewGroupOpen(false);
+    }
+  };
+
+  const renderNewGroupButton = () => (
+    <Popover open={newGroupOpen} onOpenChange={setNewGroupOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="New backlog group"
+          title="Create an empty backlog group"
+          className="h-7 w-7 shrink-0"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-3 space-y-2">
+        <p className="text-sm font-medium">New backlog group</p>
+        <input
+          autoFocus
+          value={newGroupName}
+          onChange={(e) => setNewGroupName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitNewGroup();
+            } else if (e.key === "Escape") {
+              setNewGroupOpen(false);
+            }
+          }}
+          placeholder="e.g. SQE"
+          className="w-full rounded-md border bg-transparent px-2 py-1.5 text-sm outline-none"
+        />
+        <Button type="button" size="sm" className="w-full" onClick={submitNewGroup}>
+          Create group
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+
   const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
     <div className={expanded ? "contents" : "space-y-3"}>
       {groups.map((g, gi) => {
@@ -240,6 +289,15 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
         const isEditingTitle = editingGroupTitle === titleKey;
         const isGroupOver = dragOverGroupKey === titleKey;
+        const isCustomEmpty =
+          g.rows.length === 0 &&
+          backlogCustomGroups.some((t) => t.toLowerCase() === g.title.toLowerCase());
+        const commitRename = () => {
+          const t = editingGroupText.trim();
+          if (!t) return;
+          if (isCustomEmpty) renameBacklogGroup(g.title, t);
+          else setGroupTitleOverrides((o) => ({ ...o, [titleKey]: t }));
+        };
         return (
           <div
             key={`${g.title}:${gi}`}
