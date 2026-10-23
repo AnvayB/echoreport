@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { getWeekdays, formatDateKey, getWeekStartKey, getWeekEndKey, formatWeekLabel } from "@/lib/weekUtils";
 import { dedupeTaskRows } from "@/lib/taskUtils";
-import { Loader2, FileText, Copy, Download, Mail } from "lucide-react";
+import { Loader2, FileText, Copy, Download, Mail, Pencil, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 // Plain-text fallback (strip bold/italic/underline/heading/code-fence markers) for
@@ -143,6 +143,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   const [loading, setLoading] = useState(false);
   
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
