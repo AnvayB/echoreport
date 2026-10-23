@@ -10,8 +10,12 @@ export const mergeBacklogGroups = (
   customTitles: string[]
 ): TaskGroup[] => {
   const seen = new Set(taskGroups.map((g) => g.title.toLowerCase()));
-  const extras = customTitles
-    .filter((t) => t.trim() && !seen.has(t.trim().toLowerCase()))
-    .map((t) => ({ title: t.trim(), rows: [] as TaskGroup["rows"] }));
+  const extras: TaskGroup[] = [];
+  customTitles.forEach((raw) => {
+    const title = raw.trim();
+    if (!title || seen.has(title.toLowerCase())) return;
+    seen.add(title.toLowerCase());
+    extras.push({ title, rows: [] });
+  });
   return [...taskGroups, ...extras];
 };
