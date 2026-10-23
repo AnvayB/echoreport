@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText, stripTaskFiller } from "@/lib/taskUtils";
 import { clearVerdicts } from "@/lib/nameVerification";
+import { mergeBacklogGroups } from "@/lib/backlogGroups";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -114,6 +115,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [dismissedDuplicateKeys, setDismissedDuplicateKeys] = useState<Set<string>>(new Set());
   const [dismissedPairKeys, setDismissedPairKeys] = useState<Set<string>>(new Set());
+  const [backlogCustomGroups, setBacklogCustomGroups] = useState<string[]>([]);
 
   // Load persisted "keep both" dismissals.
   useEffect(() => {
@@ -132,6 +134,26 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         (data ?? []).forEach((r) => next.add(r.pair_key));
         return next;
       });
+    })();
+  }, [user]);
+
+  // Load manually created empty backlog groups.
+  useEffect(() => {
+    if (!user) {
+      setBacklogCustomGroups([]);
+      return;
+    }
+    (async () => {
+      const { data, error } = await supabase
+        .from("backlog_groups")
+        .select("title")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
+      if (error) {
+        console.error("Failed to load backlog groups:", error);
+        return;
+      }
+      setBacklogCustomGroups((data ?? []).map((r) => r.title));
     })();
   }, [user]);
 
@@ -460,7 +482,16 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const pendingByBucket: PendingByBucket = useMemo(() => {
     const empty = { today: [] as TaskGroup[], backlog: [] as TaskGroup[], tomorrow: [] as TaskGroup[], thisWeek: [] as TaskGroup[] };
     if (pending.length === 0) {
-      return { today: null, backlog: null, tomorrow: null, thisWeek: null };
+      // No tasks at all — still show manually created empty backlog groups.
+      if (backlogCustomGroups.length === 0) {
+        return { today: null, backlog: null, tomorrow: null, thisWeek: null };
+      }
+      return {
+        today: null,
+        backlog: mergeBacklogGroups([], backlogCustomGroups),
+        tomorrow: null,
+        thisWeek: null,
+      };
     }
     const groups: TaskGroup[] = pendingGroups ?? [{ title: "General", rows: pending }];
     groups.forEach((g) => {
@@ -470,6 +501,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         if (splits[b].length > 0) empty[b].push({ title: g.title, rows: splits[b] });
       });
     });
+    // Append manually created empty groups to the backlog bucket.
+    empty.backlog = mergeBacklogGroups(empty.backlog, backlogCustomGroups);
     return {
       today: empty.today,
       backlog: empty.backlog,
@@ -477,7 +510,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       thisWeek: empty.thisWeek,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, pendingGroups, todayKey, tomorrowKey]);
+  }, [pending, pendingGroups, todayKey, tomorrowKey, backlogCustomGroups]);
 
   const toggleTask = async (row: TaskRow) => {
     if (!user) return;
@@ -599,6 +632,87 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (error) {
       toast.error("Couldn't move task");
       setPending(prev);
+      return;
+    }
+
+    // If the target group was a manually created empty group, it is now
+    // task-backed — drop the standalone row so it doesn't duplicate.
+    if (backlogCustomGroups.some((t) => t.toLowerCase() === groupTitle.toLowerCase())) {
+      void deleteBacklogGroup(groupTitle);
+    }
+  };
+
+  // Titles already in use by task-backed groups or existing custom groups.
+  const existingGroupTitles = () => {
+    const titles = new Set(backlogCustomGroups.map((t) => t.toLowerCase()));
+    pending.forEach((r) => {
+      if (r.group_title) titles.add(r.group_title.toLowerCase());
+    });
+    pendingGroups?.forEach((g) => titles.add(g.title.toLowerCase()));
+    return titles;
+  };
+
+  const createBacklogGroup = async (rawTitle: string): Promise<boolean> => {
+    if (!user) return false;
+    const title = rawTitle.trim();
+    if (!title) {
+      toast.error("Enter a group name first");
+      return false;
+    }
+    if (existingGroupTitles().has(title.toLowerCase())) {
+      toast.error("A group with that name already exists");
+      return false;
+    }
+    const prev = backlogCustomGroups;
+    setBacklogCustomGroups((list) => [...list, title]);
+    const { error } = await supabase.from("backlog_groups").insert({ user_id: user.id, title });
+    if (error) {
+      console.error("Failed to create backlog group:", error);
+      toast.error("Couldn't create group");
+      setBacklogCustomGroups(prev);
+      return false;
+    }
+    return true;
+  };
+
+  const renameBacklogGroup = async (oldTitle: string, rawNewTitle: string): Promise<boolean> => {
+    if (!user) return false;
+    const newTitle = rawNewTitle.trim();
+    if (!newTitle || newTitle === oldTitle) return false;
+    const lowerNew = newTitle.toLowerCase();
+    if (lowerNew !== oldTitle.toLowerCase() && existingGroupTitles().has(lowerNew)) {
+      toast.error("A group with that name already exists");
+      return false;
+    }
+    const prev = backlogCustomGroups;
+    setBacklogCustomGroups((list) => list.map((t) => (t === oldTitle ? newTitle : t)));
+    const { error } = await supabase
+      .from("backlog_groups")
+      .update({ title: newTitle })
+      .eq("user_id", user.id)
+      .eq("title", oldTitle);
+    if (error) {
+      console.error("Failed to rename backlog group:", error);
+      toast.error("Couldn't rename group");
+      setBacklogCustomGroups(prev);
+      return false;
+    }
+    return true;
+  };
+
+  const deleteBacklogGroup = async (title: string) => {
+    if (!user) return;
+    const prev = backlogCustomGroups;
+    setBacklogCustomGroups((list) => list.filter((t) => t !== title));
+    const { error } = await supabase
+      .from("backlog_groups")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("title", title);
+    if (error) {
+      console.error("Failed to delete backlog group:", error);
+      toast.error("Couldn't delete group");
+      setBacklogCustomGroups(prev);
     }
   };
 
@@ -755,6 +869,10 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         deleteTask,
         moveTaskToBucket,
         moveTaskToGroup,
+        backlogCustomGroups,
+        createBacklogGroup,
+        renameBacklogGroup,
+        deleteBacklogGroup,
         addMoreTasks,
         reload: load,
         duplicateClusters: visibleDuplicateClusters,
