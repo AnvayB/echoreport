@@ -53,8 +53,11 @@ export const orderBacklogGroups = (groups: TaskGroup[], savedOrder: string[]): T
 
 /** Returns a new title order with `dragged` inserted right before `target`. */
 export const moveGroupBefore = (order: string[], dragged: string, target: string): string[] => {
+  // Keep the existing entry's casing when the dragged title is already listed.
+  const existing = order.find((t) => t.toLowerCase() === dragged.toLowerCase());
+  const title = existing ?? dragged;
   const without = order.filter((t) => t.toLowerCase() !== dragged.toLowerCase());
   const idx = without.findIndex((t) => t.toLowerCase() === target.toLowerCase());
-  if (idx === -1) return [...without, dragged];
-  return [...without.slice(0, idx), dragged, ...without.slice(idx)];
+  if (idx === -1) return [...without, title];
+  return [...without.slice(0, idx), title, ...without.slice(idx)];
 };
