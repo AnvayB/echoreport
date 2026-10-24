@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatDateKey, getWeekEndKey } from "@/lib/weekUtils";
 import { mergeDuplicateTaskRows, areTaskTextsEquivalent, setTaskImportantText, isTaskImportant, getTaskComparisonTokens, normalizeTaskText, stripTaskFiller } from "@/lib/taskUtils";
 import { clearVerdicts } from "@/lib/nameVerification";
-import { mergeBacklogGroups } from "@/lib/backlogGroups";
+import { mergeBacklogGroups, orderBacklogGroups } from "@/lib/backlogGroups";
 import { resolveWhenHint } from "@/lib/scheduleHints";
 import { toast } from "sonner";
 import { addDays, isSameDay } from "date-fns";
@@ -116,6 +116,27 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
   const [dismissedDuplicateKeys, setDismissedDuplicateKeys] = useState<Set<string>>(new Set());
   const [dismissedPairKeys, setDismissedPairKeys] = useState<Set<string>>(new Set());
   const [backlogCustomGroups, setBacklogCustomGroups] = useState<string[]>([]);
+  const [backlogGroupOrder, setBacklogGroupOrder] = useState<string[]>([]);
+
+  // Load the saved display order of backlog groups.
+  useEffect(() => {
+    if (!user) {
+      setBacklogGroupOrder([]);
+      return;
+    }
+    (async () => {
+      const { data, error } = await supabase
+        .from("backlog_group_order")
+        .select("title")
+        .eq("user_id", user.id)
+        .order("position", { ascending: true });
+      if (error) {
+        console.error("Failed to load backlog group order:", error);
+        return;
+      }
+      setBacklogGroupOrder((data ?? []).map((r) => r.title));
+    })();
+  }, [user]);
 
   // Load persisted "keep both" dismissals.
   useEffect(() => {
@@ -488,7 +509,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       }
       return {
         today: null,
-        backlog: mergeBacklogGroups([], backlogCustomGroups),
+        backlog: orderBacklogGroups(mergeBacklogGroups([], backlogCustomGroups), backlogGroupOrder),
         tomorrow: null,
         thisWeek: null,
       };
@@ -501,8 +522,12 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         if (splits[b].length > 0) empty[b].push({ title: g.title, rows: splits[b] });
       });
     });
-    // Append manually created empty groups to the backlog bucket.
-    empty.backlog = mergeBacklogGroups(empty.backlog, backlogCustomGroups);
+    // Append manually created empty groups to the backlog bucket, then apply
+    // the user's saved display order.
+    empty.backlog = orderBacklogGroups(
+      mergeBacklogGroups(empty.backlog, backlogCustomGroups),
+      backlogGroupOrder
+    );
     return {
       today: empty.today,
       backlog: empty.backlog,
@@ -510,7 +535,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       thisWeek: empty.thisWeek,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, pendingGroups, todayKey, tomorrowKey, backlogCustomGroups]);
+  }, [pending, pendingGroups, todayKey, tomorrowKey, backlogCustomGroups, backlogGroupOrder]);
 
   const toggleTask = async (row: TaskRow) => {
     if (!user) return;
