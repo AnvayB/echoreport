@@ -18,7 +18,7 @@ import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./T
 import { isTaskImportant } from "@/lib/taskUtils";
 import TaskText from "./TaskText";
 import VoiceInput from "./VoiceInput";
-import { canCreateGroupOnDrop, nextBacklogGroupTitle } from "@/lib/backlogGroups";
+import { canCreateGroupOnDrop, moveGroupBefore, nextBacklogGroupTitle } from "@/lib/backlogGroups";
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
@@ -32,7 +32,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, moveTaskToGroup, addMoreTasks, reload, setTaskImportant, editTaskText,
-    backlogCustomGroups, createBacklogGroup, renameBacklogGroup, deleteBacklogGroup,
+    backlogCustomGroups, createBacklogGroup, renameBacklogGroup, deleteBacklogGroup, reorderBacklogGroups,
     isViewingToday, bucketLabels,
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
@@ -42,6 +42,10 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [regroupPrompt, setRegroupPrompt] = useState("");
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Whole-section reorder drag (expanded board only): title being dragged and
+  // the panel currently hovered as the drop position.
+  const [draggingGroupTitle, setDraggingGroupTitle] = useState<string | null>(null);
+  const [dragOverReorderKey, setDragOverReorderKey] = useState<string | null>(null);
   const [newGroupDropVisible, setNewGroupDropVisible] = useState(false);
   const newGroupDropRef = useRef<HTMLDivElement>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
