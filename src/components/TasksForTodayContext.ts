@@ -66,6 +66,9 @@ export interface TasksForTodayContextValue {
   createBacklogGroup: (title: string) => Promise<boolean>;
   renameBacklogGroup: (oldTitle: string, newTitle: string) => Promise<boolean>;
   deleteBacklogGroup: (title: string) => Promise<void>;
+  // Saved display order of backlog group titles (expanded board + list).
+  backlogGroupOrder: string[];
+  reorderBacklogGroups: (orderedTitles: string[]) => Promise<void>;
   addMoreTasks: () => Promise<void>;
   reload: () => Promise<void>;
 }
