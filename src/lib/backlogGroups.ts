@@ -33,3 +33,31 @@ export const mergeBacklogGroups = (
   });
   return [...taskGroups, ...extras];
 };
+
+/**
+ * Orders groups by a saved title order (case-insensitive). Groups without a
+ * saved position keep their relative order and come after the ordered ones.
+ */
+export const orderBacklogGroups = (groups: TaskGroup[], savedOrder: string[]): TaskGroup[] => {
+  if (savedOrder.length === 0) return groups;
+  const position = new Map(savedOrder.map((t, i) => [t.toLowerCase(), i]));
+  return [...groups].sort((a, b) => {
+    const pa = position.get(a.title.toLowerCase());
+    const pb = position.get(b.title.toLowerCase());
+    if (pa === undefined && pb === undefined) return 0;
+    if (pa === undefined) return 1;
+    if (pb === undefined) return -1;
+    return pa - pb;
+  });
+};
+
+/** Returns a new title order with `dragged` inserted right before `target`. */
+export const moveGroupBefore = (order: string[], dragged: string, target: string): string[] => {
+  // Keep the existing entry's casing when the dragged title is already listed.
+  const existing = order.find((t) => t.toLowerCase() === dragged.toLowerCase());
+  const title = existing ?? dragged;
+  const without = order.filter((t) => t.toLowerCase() !== dragged.toLowerCase());
+  const idx = without.findIndex((t) => t.toLowerCase() === target.toLowerCase());
+  if (idx === -1) return [...without, title];
+  return [...without.slice(0, idx), title, ...without.slice(idx)];
+};

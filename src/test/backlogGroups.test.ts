@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCreateGroupOnDrop, mergeBacklogGroups, nextBacklogGroupTitle } from "@/lib/backlogGroups";
+import { canCreateGroupOnDrop, mergeBacklogGroups, moveGroupBefore, nextBacklogGroupTitle, orderBacklogGroups } from "@/lib/backlogGroups";
 import type { TaskGroup } from "@/components/TasksForTodayContext";
 
 const group = (title: string, count: number): TaskGroup => ({
@@ -52,5 +52,31 @@ describe("expanded backlog empty-space drops", () => {
   it("chooses a distinct title for each new group", () => {
     expect(nextBacklogGroupTitle([])).toBe("New Group");
     expect(nextBacklogGroupTitle(["new group", "New Group 2"])).toBe("New Group 3");
+  });
+});
+
+describe("orderBacklogGroups", () => {
+  it("sorts groups by the saved title order", () => {
+    const groups = [group("SQE", 1), group("Tickets Timeline", 2), group("Project Hub", 1)];
+    const ordered = orderBacklogGroups(groups, ["Project Hub", "SQE"]);
+    expect(ordered.map((g) => g.title)).toEqual(["Project Hub", "SQE", "Tickets Timeline"]);
+  });
+
+  it("matches saved titles case-insensitively and keeps groups untouched when no order is saved", () => {
+    const groups = [group("SQE", 1), group("Miscellaneous", 3)];
+    expect(orderBacklogGroups(groups, ["miscellaneous"]).map((g) => g.title)).toEqual(["Miscellaneous", "SQE"]);
+    expect(orderBacklogGroups(groups, [])).toEqual(groups);
+  });
+});
+
+describe("moveGroupBefore", () => {
+  it("inserts the dragged title right before the target", () => {
+    expect(moveGroupBefore(["A", "B", "C", "D"], "D", "B")).toEqual(["A", "D", "B", "C"]);
+    expect(moveGroupBefore(["A", "B", "C"], "A", "C")).toEqual(["B", "A", "C"]);
+  });
+
+  it("appends when the target is missing and matches case-insensitively", () => {
+    expect(moveGroupBefore(["A", "B"], "a", "B")).toEqual(["A", "B"]);
+    expect(moveGroupBefore(["A", "B"], "C", "Z")).toEqual(["A", "B", "C"]);
   });
 });
