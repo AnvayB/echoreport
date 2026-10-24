@@ -314,6 +314,15 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             key={`${g.title}:${gi}`}
             data-board-drop-target={expanded ? "group" : undefined}
             onDragOver={(e) => {
+              // Whole-section reorder drag: hovering this panel marks the drop position.
+              if (expanded && draggingGroupTitle) {
+                if (draggingGroupTitle.toLowerCase() === g.title.toLowerCase()) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "move";
+                if (dragOverReorderKey !== titleKey) setDragOverReorderKey(titleKey);
+                return;
+              }
               if (!draggingId) return;
               e.preventDefault();
               e.stopPropagation();
@@ -323,8 +332,21 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             onDragLeave={(e) => {
               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
               if (dragOverGroupKey === titleKey) setDragOverGroupKey(null);
+              if (dragOverReorderKey === titleKey) setDragOverReorderKey(null);
             }}
             onDrop={(e) => {
+              // Whole-section reorder drop: insert the dragged section before this one.
+              if (expanded && draggingGroupTitle) {
+                e.preventDefault();
+                e.stopPropagation();
+                const dragged = draggingGroupTitle;
+                setDraggingGroupTitle(null);
+                setDragOverReorderKey(null);
+                if (dragged.toLowerCase() !== g.title.toLowerCase()) {
+                  void reorderBacklogGroups(moveGroupBefore(groups.map((grp) => grp.title), dragged, g.title));
+                }
+                return;
+              }
               e.preventDefault();
               e.stopPropagation();
               const id = e.dataTransfer.getData("text/plain");
@@ -334,7 +356,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               setDraggingId(null);
               if (row) moveTaskToGroup(row, g.title);
             }}
-            className={`${expanded ? "mb-4 break-inside-avoid rounded-md border bg-card p-3 shadow-sm" : "pl-1 rounded-md"} transition-colors ${isGroupOver ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
+            className={`${expanded ? "mb-4 break-inside-avoid rounded-md border bg-card p-3 shadow-sm" : "pl-1 rounded-md"} transition-colors ${isGroupOver ? "bg-primary/10 ring-1 ring-primary/40" : ""} ${dragOverReorderKey === titleKey ? "ring-2 ring-primary/60" : ""} ${draggingGroupTitle?.toLowerCase() === g.title.toLowerCase() ? "opacity-50" : ""}`}
           >
             <ContextMenu>
               <ContextMenuTrigger asChild>
@@ -359,7 +381,21 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                       className="mb-2 w-full border-b border-muted-foreground/40 bg-transparent text-xs font-medium uppercase text-muted-foreground outline-none"
                     />
                   ) : (
-                    <p className="mb-2 cursor-default text-xs font-medium uppercase text-muted-foreground">
+                    <p
+                      draggable={expanded}
+                      onDragStart={(e) => {
+                        if (!expanded) return;
+                        e.dataTransfer.setData("application/x-backlog-group", g.title);
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggingGroupTitle(g.title);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingGroupTitle(null);
+                        setDragOverReorderKey(null);
+                      }}
+                      className={`mb-2 flex items-center gap-1 text-xs font-medium uppercase text-muted-foreground ${expanded ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
+                    >
+                      {expanded && <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />}
                       {displayTitle}
                       <span className="ml-1.5 normal-case text-muted-foreground/70">({g.rows.length})</span>
                     </p>
