@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      backlog_group_order: {
+        Row: {
+          position: number
+          title: string
+          user_id: string
+        }
+        Insert: {
+          position: number
+          title: string
+          user_id: string
+        }
+        Update: {
+          position?: number
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       backlog_groups: {
         Row: {
           created_at: string
