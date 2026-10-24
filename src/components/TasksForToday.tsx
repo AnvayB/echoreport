@@ -373,7 +373,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 )}
               </ContextMenuContent>
             </ContextMenu>
-            <div className={expanded ? "board-scroll max-h-[52vh] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
+            <div className={expanded ? "board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
               {g.rows.length > 0 ? (
                 g.rows.map(renderCheckboxRow)
               ) : (
@@ -428,7 +428,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
         ) : (
-          <div className="board-scroll max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+          <div className="board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto pr-1">
             {todayRows.map(renderCheckboxRow)}
           </div>
         )}
