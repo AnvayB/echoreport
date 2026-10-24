@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TasksForToday from "@/components/TasksForToday";
 
-const mocks = vi.hoisted(() => ({ move: vi.fn(), rename: vi.fn() }));
+const mocks = vi.hoisted(() => ({ move: vi.fn(), rename: vi.fn(), create: vi.fn() }));
 vi.mock("@/components/TaskText", () => ({ default: ({ text }: { text: string }) => <>{text}</> }));
 vi.mock("@/components/VoiceInput", () => ({ default: () => null }));
 vi.mock("@/components/TasksForTodayContext", () => ({
@@ -16,6 +16,7 @@ vi.mock("@/components/TasksForTodayContext", () => ({
     bucketLabels: { backlog: "Backlog", today: "Today", tomorrow: "Tomorrow", thisWeek: "This Week" },
     backlogCustomGroups: ["New Group"], duplicateClusters: [], newTasksText: "",
     moveTaskToGroup: mocks.move, renameBacklogGroup: mocks.rename,
+    createBacklogGroup: mocks.create,
   }),
 }));
 
@@ -25,6 +26,30 @@ const transfer = {
 
 describe("backlog board drag-to-create", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("opens only the board's new-group form and creates the named group", async () => {
+    mocks.create.mockResolvedValue(true);
+    render(<TasksForToday />);
+    fireEvent.click(screen.getByRole("button", { name: "Open expanded backlog" }));
+    const board = screen.getByRole("dialog");
+    fireEvent.click(within(board).getByRole("button", { name: "New backlog group" }));
+    const inputs = screen.getAllByPlaceholderText("e.g. SQE");
+    expect(inputs).toHaveLength(1);
+    fireEvent.change(inputs[0], { target: { value: "Tickets Timeline" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create group" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith("Tickets Timeline"));
+    await waitFor(() => expect(screen.queryByPlaceholderText("e.g. SQE")).not.toBeInTheDocument());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("still creates empty groups from the backlog list", async () => {
+    mocks.create.mockResolvedValue(true);
+    render(<TasksForToday />);
+    fireEvent.click(screen.getByRole("button", { name: "New backlog group" }));
+    fireEvent.change(screen.getByPlaceholderText("e.g. SQE"), { target: { value: "Project Hub" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create group" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith("Project Hub"));
+  });
 
   it("moves the dragged task to a distinct new group on an empty-space drop", async () => {
     render(<TasksForToday />);
