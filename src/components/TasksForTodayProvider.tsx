@@ -621,9 +621,25 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (row.group_title === groupTitle && alreadyInBacklog) return;
 
     const prev = pending;
+    const prevGroups = pendingGroups;
     setPending((list) =>
       list.map((r) => (r.id === row.id ? { ...r, group_title: groupTitle, task_date: targetDate } : r))
     );
+    // Keep the grouped view in sync too — the backlog board renders from
+    // pendingGroups (via pendingByBucket), so without this the move is
+    // invisible until the next reload.
+    setPendingGroups((groups) => {
+      if (!groups) return groups;
+      const moved = { ...row, group_title: groupTitle, task_date: targetDate };
+      const without = groups
+        .map((g) => ({ ...g, rows: g.rows.filter((r) => r.id !== row.id) }))
+        .filter((g) => g.rows.length > 0);
+      const target = without.find((g) => g.title.toLowerCase() === groupTitle.toLowerCase());
+      if (target) {
+        return without.map((g) => (g === target ? { ...g, rows: [...g.rows, moved] } : g));
+      }
+      return [...without, { title: groupTitle, rows: [moved] }];
+    });
 
     const updates: { group_title: string; task_date?: string } = { group_title: groupTitle };
     if (!alreadyInBacklog) updates.task_date = targetDate;
@@ -632,6 +648,7 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (error) {
       toast.error("Couldn't move task");
       setPending(prev);
+      setPendingGroups(prevGroups);
       return;
     }
 
