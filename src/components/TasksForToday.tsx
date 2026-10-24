@@ -46,7 +46,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const newGroupDropRef = useRef<HTMLDivElement>(null);
   const [interimVoiceText, setInterimVoiceText] = useState("");
   const [backlogOpen, setBacklogOpen] = useState(false);
-  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupLocation, setNewGroupLocation] = useState<"list" | "board" | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [backlogBoardOpen, setBacklogBoardOpen] = useState(false);
   const [addBarMinimized, setAddBarMinimized] = useState(false);
@@ -244,12 +244,15 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     const ok = await createBacklogGroup(newGroupName);
     if (ok) {
       setNewGroupName("");
-      setNewGroupOpen(false);
+      setNewGroupLocation(null);
     }
   };
 
-  const renderNewGroupButton = () => (
-    <Popover open={newGroupOpen} onOpenChange={setNewGroupOpen}>
+  const renderNewGroupButton = (location: "list" | "board") => (
+    <Popover
+      open={newGroupLocation === location}
+      onOpenChange={(open) => setNewGroupLocation(open ? location : null)}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -273,7 +276,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               e.preventDefault();
               submitNewGroup();
             } else if (e.key === "Escape") {
-              setNewGroupOpen(false);
+              setNewGroupLocation(null);
             }
           }}
           placeholder="e.g. SQE"
@@ -514,7 +517,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 </span>
               )}
             </button>
-            {renderNewGroupButton()}
+            {renderNewGroupButton("list")}
             {hasItems && (
               <Button
                 type="button"
@@ -897,6 +900,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       </Dialog>
       <Dialog open={backlogBoardOpen} onOpenChange={(open) => {
         setBacklogBoardOpen(open);
+        setNewGroupLocation(null);
         setNewGroupDropVisible(false);
       }}>
         <DialogContent className="inset-0 left-0 top-0 grid h-dvh w-screen max-w-none grid-rows-[auto_minmax(0,1fr)] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:rounded-none">
@@ -912,7 +916,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               {renderBoardBucketTarget("today")}
               {renderBoardBucketTarget("tomorrow")}
               {renderBoardBucketTarget("thisWeek")}
-              {renderNewGroupButton()}
+              {renderNewGroupButton("board")}
             </div>
             <DialogDescription className="sr-only">
               Expanded backlog with task groups arranged across the screen.
