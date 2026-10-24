@@ -707,6 +707,13 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     }
     const prev = backlogCustomGroups;
     setBacklogCustomGroups((list) => [...list, title]);
+    // New groups go to the end of the saved display order.
+    setBacklogGroupOrder((list) => [...list, title]);
+    void supabase.from("backlog_group_order").insert({
+      user_id: user.id,
+      title,
+      position: backlogGroupOrder.length,
+    });
     const { error } = await supabase.from("backlog_groups").insert({ user_id: user.id, title });
     if (error) {
       console.error("Failed to create backlog group:", error);
@@ -742,10 +749,20 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         groupRows.some((groupRow) => groupRow.id === row.id)
           ? { ...row, group_title: newTitle } : row
       ));
+      setBacklogGroupOrder((list) => list.map((t) => (t === oldTitle ? newTitle : t)));
+      void supabase.from("backlog_group_order")
+        .update({ title: newTitle })
+        .eq("user_id", user.id)
+        .eq("title", oldTitle);
       return true;
     }
     const prev = backlogCustomGroups;
     setBacklogCustomGroups((list) => list.map((t) => (t === oldTitle ? newTitle : t)));
+    setBacklogGroupOrder((list) => list.map((t) => (t === oldTitle ? newTitle : t)));
+    void supabase.from("backlog_group_order")
+      .update({ title: newTitle })
+      .eq("user_id", user.id)
+      .eq("title", oldTitle);
     const { error } = await supabase
       .from("backlog_groups")
       .update({ title: newTitle })
@@ -764,6 +781,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
     if (!user) return;
     const prev = backlogCustomGroups;
     setBacklogCustomGroups((list) => list.filter((t) => t !== title));
+    setBacklogGroupOrder((list) => list.filter((t) => t !== title));
+    void supabase.from("backlog_group_order").delete().eq("user_id", user.id).eq("title", title);
     const { error } = await supabase
       .from("backlog_groups")
       .delete()
@@ -773,6 +792,32 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
       console.error("Failed to delete backlog group:", error);
       toast.error("Couldn't delete group");
       setBacklogCustomGroups(prev);
+    }
+  };
+
+  // Persists a new display order for the backlog groups (drag-by-title reorder).
+  const reorderBacklogGroups = async (orderedTitles: string[]): Promise<void> => {
+    if (!user) return;
+    const prev = backlogGroupOrder;
+    setBacklogGroupOrder(orderedTitles);
+    const { error: deleteError } = await supabase
+      .from("backlog_group_order")
+      .delete()
+      .eq("user_id", user.id);
+    if (deleteError) {
+      console.error("Failed to save group order:", deleteError);
+      toast.error("Couldn't save group order");
+      setBacklogGroupOrder(prev);
+      return;
+    }
+    if (orderedTitles.length === 0) return;
+    const { error } = await supabase.from("backlog_group_order").insert(
+      orderedTitles.map((title, position) => ({ user_id: user.id, title, position }))
+    );
+    if (error) {
+      console.error("Failed to save group order:", error);
+      toast.error("Couldn't save group order");
+      setBacklogGroupOrder(prev);
     }
   };
 
@@ -933,6 +978,8 @@ export const TasksForTodayProvider = ({ selectedDate, children }: ProviderProps)
         createBacklogGroup,
         renameBacklogGroup,
         deleteBacklogGroup,
+        backlogGroupOrder,
+        reorderBacklogGroups,
         addMoreTasks,
         reload: load,
         duplicateClusters: visibleDuplicateClusters,
