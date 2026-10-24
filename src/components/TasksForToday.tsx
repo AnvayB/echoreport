@@ -373,7 +373,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 )}
               </ContextMenuContent>
             </ContextMenu>
-            <div className={expanded ? "max-h-[52vh] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
+            <div className={expanded ? "board-scroll max-h-[52vh] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
               {g.rows.length > 0 ? (
                 g.rows.map(renderCheckboxRow)
               ) : (
@@ -428,7 +428,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
         ) : (
-          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+          <div className="board-scroll max-h-[52vh] space-y-2 overflow-y-auto pr-1">
             {todayRows.map(renderCheckboxRow)}
           </div>
         )}
@@ -961,7 +961,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               ]);
               await moveTaskToGroup(row, title);
             }}
-            className={`min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
+            className={`board-scroll min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
           >
             {(() => {
               const backlogGroups = pendingByBucket.backlog ?? [];
