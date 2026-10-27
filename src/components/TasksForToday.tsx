@@ -191,46 +191,48 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 <Check className="h-3 w-3" /> Saved
               </span>
             )}
-            {!isEditing && (() => {
-              const age = formatAge(row.created_at);
-              if (!age) return null;
-              const days = daysSince(row.created_at) ?? 0;
-              const tone =
-                days <= 6
-                  ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
-                  : days >= 90
-                    ? "bg-muted/50 text-muted-foreground border-border"
-                    : days >= 60
-                      ? "bg-[#5a1a1a]/15 text-[#7a1f1f] dark:text-[#c76b6b] border-[#7a1f1f]/40"
-                      : days >= 28
-                        ? "bg-destructive/15 text-destructive border-destructive/40"
-                        : days >= 14
-                          ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
-                          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
-              return (
-                <span
-                  title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
-                  className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-0 text-[10px] leading-4 font-medium tabular-nums ${tone}`}
-                >
-                  {age}
-                </span>
-              );
-            })()}
-            {!isEditing && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  deleteTask(row);
-                }}
-                disabled={isSaving}
-                aria-label="Remove task"
-                className="mt-0.5 shrink-0 text-muted-foreground/60 hover:text-destructive opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
+            {!isEditing &&
+              (() => {
+                const age = formatAge(row.created_at);
+                const days = daysSince(row.created_at) ?? 0;
+                const tone =
+                  days <= 6
+                    ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
+                    : days >= 90
+                      ? "bg-muted/50 text-muted-foreground border-border"
+                      : days >= 60
+                        ? "bg-[#5a1a1a]/15 text-[#7a1f1f] dark:text-[#c76b6b] border-[#7a1f1f]/40"
+                        : days >= 28
+                          ? "bg-destructive/15 text-destructive border-destructive/40"
+                          : days >= 14
+                            ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
+                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
+                return (
+                  <span className="relative mt-0.5 -mr-1 inline-flex shrink-0 items-center">
+                    {age && (
+                      <span
+                        title={row.created_at ? `Added ${new Date(row.created_at).toLocaleDateString()}` : undefined}
+                        className={`shrink-0 rounded-full border px-1.5 py-0 text-[10px] leading-4 font-medium tabular-nums ${tone}`}
+                      >
+                        {age}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteTask(row);
+                      }}
+                      disabled={isSaving}
+                      aria-label="Remove task"
+                      className="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-muted-foreground/60 hover:text-destructive opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto transition-opacity"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                );
+              })()}
           </label>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
@@ -413,7 +415,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 )}
               </ContextMenuContent>
             </ContextMenu>
-            <div className={expanded ? "board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto pr-1" : "space-y-1.5"}>
+            <div className={expanded ? "board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto" : "space-y-1.5"}>
               {g.rows.length > 0 ? (
                 g.rows.map(renderCheckboxRow)
               ) : (
@@ -468,7 +470,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
         ) : (
-          <div className="board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto pr-1">
+          <div className="board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto">
             {todayRows.map(renderCheckboxRow)}
           </div>
         )}
