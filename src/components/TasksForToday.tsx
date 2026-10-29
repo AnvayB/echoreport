@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +18,26 @@ import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./T
 import { isTaskImportant } from "@/lib/taskUtils";
 import TaskText from "./TaskText";
 import VoiceInput from "./VoiceInput";
-import { canCreateGroupOnDrop, moveGroupBefore, nextBacklogGroupTitle } from "@/lib/backlogGroups";
+import { canCreateGroupOnDrop, moveGroupBefore, nextBacklogGroupTitle, splitBoardPanels } from "@/lib/backlogGroups";
+
+// Expanded backlog board: column count mirrors the md/xl/2xl breakpoints the
+// old CSS-columns layout used, so panels reflow the same way on resize.
+const useBoardColumnCount = () => {
+  const get = () =>
+    typeof window === "undefined" || !window.matchMedia ? 1
+    : window.matchMedia("(min-width: 1536px)").matches ? 4
+    : window.matchMedia("(min-width: 1280px)").matches ? 3
+    : window.matchMedia("(min-width: 768px)").matches ? 2
+    : 1;
+  const [cols, setCols] = useState(get);
+  useEffect(() => {
+    const mqs = ["(min-width: 768px)", "(min-width: 1280px)", "(min-width: 1536px)"].map((q) => window.matchMedia(q));
+    const onChange = () => setCols(get());
+    mqs.forEach((mq) => mq.addEventListener("change", onChange));
+    return () => mqs.forEach((mq) => mq.removeEventListener("change", onChange));
+  }, []);
+  return cols;
+};
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
