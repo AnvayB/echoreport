@@ -1006,16 +1006,10 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             }}
             className={`board-scroll min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
           >
-            <div className="flex min-h-full flex-col gap-4">
-              <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
-                {renderBoardSchedulePanel("today")}
-                {renderBacklogGroups(pendingByBucket.backlog ?? [], true)}
-              </div>
-              <div className="mt-auto grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                <div className="min-w-0 md:col-start-2 xl:col-start-3 2xl:col-start-4">
-                  {renderBoardSchedulePanel("tomorrow")}
-                </div>
-              </div>
+            <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
+              {renderBoardSchedulePanel("today")}
+              {renderBacklogGroups(pendingByBucket.backlog ?? [], true)}
+              {renderBoardSchedulePanel("tomorrow")}
             </div>
           </div>
           <div
