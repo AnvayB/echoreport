@@ -61,3 +61,31 @@ export const moveGroupBefore = (order: string[], dragged: string, target: string
   if (idx === -1) return [...without, title];
   return [...without.slice(0, idx), title, ...without.slice(idx)];
 };
+
+/**
+ * Splits board panels into `columnCount` contiguous, height-balanced chunks
+ * (document order preserved). The last panel always ends the rightmost
+ * column, so the Tomorrow panel stays below whatever card precedes it.
+ */
+export const splitBoardPanels = <T,>(panels: T[], heights: number[], columnCount: number): T[][] => {
+  if (panels.length === 0) return [];
+  const cols = Math.max(1, Math.min(columnCount, panels.length));
+  const total = heights.reduce((a, b) => a + b, 0);
+  const target = total / cols;
+  const chunks: T[][] = [];
+  let current: T[] = [];
+  let currentHeight = 0;
+  panels.forEach((panel, i) => {
+    const remainingCols = cols - chunks.length - 1;
+    const panelsLeft = panels.length - i; // including the current panel
+    if (current.length > 0 && remainingCols > 0 && panelsLeft >= remainingCols && currentHeight >= target) {
+      chunks.push(current);
+      current = [];
+      currentHeight = 0;
+    }
+    current.push(panel);
+    currentHeight += heights[i] ?? 0;
+  });
+  chunks.push(current);
+  return chunks;
+};

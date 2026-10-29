@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +18,27 @@ import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./T
 import { isTaskImportant } from "@/lib/taskUtils";
 import TaskText from "./TaskText";
 import VoiceInput from "./VoiceInput";
-import { canCreateGroupOnDrop, moveGroupBefore, nextBacklogGroupTitle } from "@/lib/backlogGroups";
+import { canCreateGroupOnDrop, moveGroupBefore, nextBacklogGroupTitle, splitBoardPanels } from "@/lib/backlogGroups";
+
+// Expanded backlog board: column count mirrors the md/xl/2xl breakpoints the
+// old CSS-columns layout used, so panels reflow the same way on resize.
+const useBoardColumnCount = () => {
+  const get = () =>
+    typeof window === "undefined" || !window.matchMedia ? 1
+    : window.matchMedia("(min-width: 1536px)").matches ? 4
+    : window.matchMedia("(min-width: 1280px)").matches ? 3
+    : window.matchMedia("(min-width: 768px)").matches ? 2
+    : 1;
+  const [cols, setCols] = useState(get);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mqs = ["(min-width: 768px)", "(min-width: 1280px)", "(min-width: 1536px)"].map((q) => window.matchMedia(q));
+    const onChange = () => setCols(get());
+    mqs.forEach((mq) => mq.addEventListener("change", onChange));
+    return () => mqs.forEach((mq) => mq.removeEventListener("change", onChange));
+  }, []);
+  return cols;
+};
 
 interface TasksForTodayProps {
   section?: "pending" | "completedYesterday" | "completedToday";
@@ -60,6 +80,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [editingGroupTitle, setEditingGroupTitle] = useState<string | null>(null); // key = `${bucket}:${gi}`
   const [editingGroupText, setEditingGroupText] = useState("");
   const [groupTitleOverrides, setGroupTitleOverrides] = useState<Record<string, string>>({});
+  const boardColumnCount = useBoardColumnCount();
   const [randomTask, setRandomTask] = useState<TaskRow | null>(null);
 
   const rollRandomTask = () => {
@@ -295,9 +316,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     </Popover>
   );
 
-  const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
-    <div className={expanded ? "contents" : "space-y-3"}>
-      {groups.map((g, gi) => {
+  const renderBacklogGroupPanel = (g: TaskGroup, gi: number, groups: TaskGroup[], expanded: boolean) => {
         const titleKey = `backlog:${g.title}`;
         const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
         const isEditingTitle = editingGroupTitle === titleKey;
@@ -425,8 +444,12 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               )}
             </div>
           </div>
-        );
-      })}
+    );
+  };
+
+  const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
+    <div className={expanded ? "contents" : "space-y-3"}>
+      {groups.map((g, gi) => renderBacklogGroupPanel(g, gi, groups, expanded))}
     </div>
   );
 
@@ -684,6 +707,22 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
 
   // ─── Default: pending buckets + blockers + add-more ──────────
   const isEmpty = loaded && pending.length === 0 && blockers.length === 0;
+
+  // Expanded board: distribute panels into responsive flex columns, balanced by
+  // estimated height, so Tomorrow always ends up below the last right-side card.
+  const boardGroups = pendingByBucket.backlog ?? [];
+  const boardBucketRowCount = (b: "today" | "tomorrow") =>
+    (pendingByBucket[b] ?? []).flatMap((g) => g.rows).length;
+  const boardPanels: { key: string; height: number; node: ReactNode }[] = [
+    { key: "board:today", height: 96 + boardBucketRowCount("today") * 36, node: renderBoardSchedulePanel("today") },
+    ...boardGroups.map((g, gi) => ({
+      key: `board:group:${g.title}`,
+      height: 64 + Math.max(1, g.rows.length) * 36,
+      node: renderBacklogGroupPanel(g, gi, boardGroups, true),
+    })),
+    { key: "board:tomorrow", height: 96 + boardBucketRowCount("tomorrow") * 36, node: renderBoardSchedulePanel("tomorrow") },
+  ];
+  const boardColumns = splitBoardPanels(boardPanels, boardPanels.map((p) => p.height), boardColumnCount);
 
   return (
     <Card>
@@ -1006,10 +1045,14 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             }}
             className={`board-scroll min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
           >
-            <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
-              {renderBoardSchedulePanel("today")}
-              {renderBacklogGroups(pendingByBucket.backlog ?? [], true)}
-              {renderBoardSchedulePanel("tomorrow")}
+            <div className="flex items-start gap-4">
+              {boardColumns.map((col, ci) => (
+                <div key={ci} className="min-w-0 flex-1">
+                  {col.map((p) => (
+                    <div key={p.key}>{p.node}</div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
           <div
