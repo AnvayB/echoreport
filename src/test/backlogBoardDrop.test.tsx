@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TasksForToday from "@/components/TasksForToday";
 
-const mocks = vi.hoisted(() => ({ move: vi.fn(), rename: vi.fn(), create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ move: vi.fn(), moveBucket: vi.fn(), rename: vi.fn(), create: vi.fn() }));
 vi.mock("@/components/TaskText", () => ({ default: ({ text }: { text: string }) => <>{text}</> }));
 vi.mock("@/components/VoiceInput", () => ({ default: () => null }));
 vi.mock("@/components/TasksForTodayContext", () => ({
@@ -16,6 +16,7 @@ vi.mock("@/components/TasksForTodayContext", () => ({
     bucketLabels: { backlog: "Backlog", today: "Today", tomorrow: "Tomorrow", thisWeek: "This Week" },
     backlogCustomGroups: ["New Group"], duplicateClusters: [], newTasksText: "",
     moveTaskToGroup: mocks.move, renameBacklogGroup: mocks.rename,
+    moveTaskToBucket: mocks.moveBucket,
     createBacklogGroup: mocks.create,
   }),
 }));
@@ -26,6 +27,21 @@ const transfer = {
 
 describe("backlog board drag-to-create", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("moves a task into Tomorrow without creating a backlog group", async () => {
+    render(<TasksForToday />);
+    fireEvent.click(screen.getByRole("button", { name: "Open expanded backlog" }));
+    const row = screen.getByText("Review SQE").closest("label");
+    if (!row) throw new Error("Task row missing");
+    const target = screen.getByLabelText("Tomorrow tasks");
+    fireEvent.dragStart(row, { dataTransfer: transfer });
+    fireEvent.dragOver(target, { dataTransfer: transfer });
+    fireEvent.drop(target, { dataTransfer: transfer });
+    await waitFor(() => expect(mocks.moveBucket).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "task-1" }), "tomorrow",
+    ));
+    expect(mocks.move).not.toHaveBeenCalled();
+  });
 
   it("opens only the board's new-group form and creates the named group", async () => {
     mocks.create.mockResolvedValue(true);

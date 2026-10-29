@@ -430,23 +430,24 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     </div>
   );
 
-  // "Today" panel shown as the first column of the expanded backlog board.
-  const renderBoardTodayPanel = () => {
-    const todayRows = (pendingByBucket.today ?? []).flatMap((g) => g.rows);
-    const todayKey = "board:today";
-    const isOver = dragOverGroupKey === todayKey;
+  // Scheduled panels share the same task controls and movement operations.
+  const renderBoardSchedulePanel = (bucket: "today" | "tomorrow") => {
+    const rows = (pendingByBucket[bucket] ?? []).flatMap((g) => g.rows);
+    const panelKey = `board:${bucket}`;
+    const isOver = dragOverGroupKey === panelKey;
     return (
       <div
-        data-board-drop-target="today"
+        data-board-drop-target={bucket}
+        aria-label={`${bucketLabels[bucket]} tasks`}
         onDragOver={(e) => {
           if (!draggingId) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
-          if (dragOverGroupKey !== todayKey) setDragOverGroupKey(todayKey);
+          if (dragOverGroupKey !== panelKey) setDragOverGroupKey(panelKey);
         }}
         onDragLeave={(e) => {
           if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-          if (dragOverGroupKey === todayKey) setDragOverGroupKey(null);
+          if (dragOverGroupKey === panelKey) setDragOverGroupKey(null);
         }}
         onDrop={(e) => {
           e.preventDefault();
@@ -455,23 +456,23 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           setDragOverGroupKey(null);
           setDragOverBucket(null);
           setDraggingId(null);
-          if (row) moveTaskToBucket(row, "today");
+          if (row) moveTaskToBucket(row, bucket);
         }}
         className={`mb-4 break-inside-avoid rounded-md border p-3 shadow-sm transition-colors ${
           isOver ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-primary/40 bg-primary/5"
         }`}
       >
         <p className="mb-2 text-xs font-medium uppercase text-primary">
-          Today
-          <span className="ml-1.5 normal-case text-primary/70">({todayRows.length})</span>
+          {bucketLabels[bucket]}
+          <span className="ml-1.5 normal-case text-primary/70">({rows.length})</span>
         </p>
-        {todayRows.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="text-xs italic text-muted-foreground py-1">
             {isOver ? "Drop here" : "Drag tasks here"}
           </p>
         ) : (
           <div className="board-scroll max-h-[calc(100dvh-10rem)] space-y-2 overflow-y-auto">
-            {todayRows.map(renderCheckboxRow)}
+            {rows.map(renderCheckboxRow)}
           </div>
         )}
       </div>
@@ -1005,21 +1006,17 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             }}
             className={`board-scroll min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
           >
-            {(() => {
-              const backlogGroups = pendingByBucket.backlog ?? [];
-              const todayRows = pendingByBucket.today ?? [];
-              const hasAnything =
-                backlogGroups.length > 0 || todayRows.some((g) => g.rows.length > 0);
-              if (!hasAnything) {
-                return <p className="text-sm italic text-muted-foreground">No tasks yet.</p>;
-              }
-              return (
-                <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
-                  {renderBoardTodayPanel()}
-                  {renderBacklogGroups(backlogGroups, true)}
+            <div className="flex min-h-full flex-col gap-4">
+              <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
+                {renderBoardSchedulePanel("today")}
+                {renderBacklogGroups(pendingByBucket.backlog ?? [], true)}
+              </div>
+              <div className="mt-auto grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="min-w-0 md:col-start-2 xl:col-start-3 2xl:col-start-4">
+                  {renderBoardSchedulePanel("tomorrow")}
                 </div>
-              );
-            })()}
+              </div>
+            </div>
           </div>
           <div
             ref={newGroupDropRef}
