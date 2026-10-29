@@ -314,9 +314,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     </Popover>
   );
 
-  const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
-    <div className={expanded ? "contents" : "space-y-3"}>
-      {groups.map((g, gi) => {
+  const renderBacklogGroupPanel = (g: TaskGroup, gi: number, groups: TaskGroup[], expanded: boolean) => {
         const titleKey = `backlog:${g.title}`;
         const displayTitle = groupTitleOverrides[titleKey] ?? g.title;
         const isEditingTitle = editingGroupTitle === titleKey;
