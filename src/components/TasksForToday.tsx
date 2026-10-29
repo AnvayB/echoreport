@@ -442,8 +442,12 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               )}
             </div>
           </div>
-        );
-      })}
+    );
+  };
+
+  const renderBacklogGroups = (groups: TaskGroup[], expanded = false) => (
+    <div className={expanded ? "contents" : "space-y-3"}>
+      {groups.map((g, gi) => renderBacklogGroupPanel(g, gi, groups, expanded))}
     </div>
   );
 
