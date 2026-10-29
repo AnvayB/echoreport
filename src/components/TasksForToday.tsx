@@ -707,6 +707,22 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   // ─── Default: pending buckets + blockers + add-more ──────────
   const isEmpty = loaded && pending.length === 0 && blockers.length === 0;
 
+  // Expanded board: distribute panels into responsive flex columns, balanced by
+  // estimated height, so Tomorrow always ends up below the last right-side card.
+  const boardGroups = pendingByBucket.backlog ?? [];
+  const boardBucketRowCount = (b: "today" | "tomorrow") =>
+    (pendingByBucket[b] ?? []).flatMap((g) => g.rows).length;
+  const boardPanels: { key: string; height: number; node: ReactNode }[] = [
+    { key: "board:today", height: 96 + boardBucketRowCount("today") * 36, node: renderBoardSchedulePanel("today") },
+    ...boardGroups.map((g, gi) => ({
+      key: `board:group:${g.title}`,
+      height: 64 + Math.max(1, g.rows.length) * 36,
+      node: renderBacklogGroupPanel(g, gi, boardGroups, true),
+    })),
+    { key: "board:tomorrow", height: 96 + boardBucketRowCount("tomorrow") * 36, node: renderBoardSchedulePanel("tomorrow") },
+  ];
+  const boardColumns = splitBoardPanels(boardPanels, boardPanels.map((p) => p.height), boardColumnCount);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -1028,10 +1044,14 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
             }}
             className={`board-scroll min-h-0 overflow-y-auto bg-muted/30 p-4 sm:p-5 ${addBarMinimized ? "pb-6" : "pb-36"}`}
           >
-            <div className="columns-1 gap-4 md:columns-2 xl:columns-3 2xl:columns-4">
-              {renderBoardSchedulePanel("today")}
-              {renderBacklogGroups(pendingByBucket.backlog ?? [], true)}
-              {renderBoardSchedulePanel("tomorrow")}
+            <div className="flex items-start gap-4">
+              {boardColumns.map((col, ci) => (
+                <div key={ci} className="min-w-0 flex-1">
+                  {col.map((p) => (
+                    <div key={p.key}>{p.node}</div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
           <div
