@@ -77,8 +77,8 @@ export const splitBoardPanels = <T,>(panels: T[], heights: number[], columnCount
   let currentHeight = 0;
   panels.forEach((panel, i) => {
     const remainingCols = cols - chunks.length - 1;
-    const remainingPanels = panels.length - i - 1;
-    if (current.length > 0 && remainingCols > 0 && remainingPanels >= remainingCols && currentHeight >= target) {
+    const panelsLeft = panels.length - i; // including the current panel
+    if (current.length > 0 && remainingCols > 0 && panelsLeft >= remainingCols && currentHeight >= target) {
       chunks.push(current);
       current = [];
       currentHeight = 0;
