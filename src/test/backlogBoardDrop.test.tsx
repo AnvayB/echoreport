@@ -104,3 +104,25 @@ describe("backlog board drag-to-create", () => {
     expect(mocks.move).not.toHaveBeenCalled();
   });
 });
+describe("splitBoardPanels", () => {
+  it("keeps order and puts the last panel in the rightmost column", async () => {
+    const { splitBoardPanels } = await import("@/lib/backlogGroups");
+    const panels = ["today", "a", "b", "c", "tomorrow"];
+    const heights = [100, 300, 300, 300, 100];
+    const cols = splitBoardPanels(panels, heights, 3);
+    expect(cols.flat()).toEqual(panels);
+    expect(cols).toHaveLength(3);
+    expect(cols[cols.length - 1][cols[cols.length - 1].length - 1]).toBe("tomorrow");
+  });
+
+  it("clamps column count to the panel count", async () => {
+    const { splitBoardPanels } = await import("@/lib/backlogGroups");
+    const cols = splitBoardPanels(["today", "tomorrow"], [100, 100], 4);
+    expect(cols).toEqual([["today"], ["tomorrow"]]);
+  });
+
+  it("returns a single column when only one column fits", async () => {
+    const { splitBoardPanels } = await import("@/lib/backlogGroups");
+    expect(splitBoardPanels(["today", "a", "tomorrow"], [50, 50, 50], 1)).toEqual([["today", "a", "tomorrow"]]);
+  });
+});

@@ -31,6 +31,7 @@ const useBoardColumnCount = () => {
     : 1;
   const [cols, setCols] = useState(get);
   useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
     const mqs = ["(min-width: 768px)", "(min-width: 1280px)", "(min-width: 1536px)"].map((q) => window.matchMedia(q));
     const onChange = () => setCols(get());
     mqs.forEach((mq) => mq.addEventListener("change", onChange));
