@@ -79,6 +79,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const [editingGroupTitle, setEditingGroupTitle] = useState<string | null>(null); // key = `${bucket}:${gi}`
   const [editingGroupText, setEditingGroupText] = useState("");
   const [groupTitleOverrides, setGroupTitleOverrides] = useState<Record<string, string>>({});
+  const boardColumnCount = useBoardColumnCount();
   const [randomTask, setRandomTask] = useState<TaskRow | null>(null);
 
   const rollRandomTask = () => {
