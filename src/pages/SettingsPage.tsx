@@ -19,6 +19,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { TEMPLATE_PRESETS, type TemplatePreset } from "@/lib/templatePresets";
 
+import ThemeToggle from "@/components/ThemeToggle";
+
 interface ReportTemplate {
   id: string;
   name: string;
@@ -155,12 +157,13 @@ const SettingsPage = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
+            <div className="flex-1">
               <CardTitle>Report Templates</CardTitle>
               <CardDescription>
                 Create multiple weekly report formats and pick one when generating.
               </CardDescription>
             </div>
+            <ThemeToggle />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

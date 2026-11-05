@@ -17,6 +17,7 @@ import {
 import { useTasksForToday, type TaskRow, type TaskGroup, type Bucket } from "./TasksForTodayContext";
 import { isTaskImportant } from "@/lib/taskUtils";
 import TaskText from "./TaskText";
+import ThemeToggle from "./ThemeToggle";
 import VoiceInput from "./VoiceInput";
 import { canCreateGroupOnDrop, moveGroupBefore, nextBacklogGroupTitle, splitBoardPanels } from "@/lib/backlogGroups";
 
@@ -218,16 +219,16 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 const days = daysSince(row.created_at) ?? 0;
                 const tone =
                   days <= 6
-                    ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
+                    ? "bg-success/15 text-success border-success/30"
                     : days >= 90
                       ? "bg-muted/50 text-muted-foreground border-border"
                       : days >= 60
-                        ? "bg-[#5a1a1a]/15 text-[#7a1f1f] dark:text-[#c76b6b] border-[#7a1f1f]/40"
+                        ? "bg-aged/15 text-aged border-aged/40"
                         : days >= 28
                           ? "bg-destructive/15 text-destructive border-destructive/40"
                           : days >= 14
-                            ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30"
-                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
+                            ? "bg-caution/10 text-caution border-caution/30"
+                            : "bg-warning/10 text-warning border-warning/30";
                 return (
                   <span className="relative mt-0.5 -mr-1 inline-flex shrink-0 items-center">
                     {age && (
@@ -999,6 +1000,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               {renderBoardBucketTarget("tomorrow")}
               {renderBoardBucketTarget("thisWeek")}
               {renderNewGroupButton("board")}
+              <ThemeToggle />
             </div>
             <DialogDescription className="sr-only">
               Expanded backlog with task groups arranged across the screen.

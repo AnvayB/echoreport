@@ -19,8 +19,8 @@ export const STATUS_LABEL: Record<ProjectStatus, string> = {
 export const STATUS_BADGE_CLASS: Record<ProjectStatus, string> = {
   not_started: "bg-muted text-muted-foreground",
   incomplete: "bg-destructive/15 text-destructive",
-  semi_complete: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  complete: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  semi_complete: "bg-warning/15 text-warning",
+  complete: "bg-success/15 text-success",
 };
 
 export interface RegionCounts {

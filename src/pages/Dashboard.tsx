@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import ThemeToggle from "@/components/ThemeToggle";
 import WeekDayCard from "@/components/WeekDayCard";
 import DailyEntryPanel from "@/components/DailyEntryPanel";
 import TasksForToday from "@/components/TasksForToday";
@@ -46,6 +47,7 @@ const Dashboard = () => {
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
           <h1 className="text-xl font-bold">Echo Report</h1>
           <div className="flex gap-1">
+            <ThemeToggle />
             {user?.email?.toLowerCase() === PROJECT_HUB_OWNER_EMAIL.toLowerCase() && (
               <Button variant="ghost" size="icon" onClick={() => navigate("/project-hub")}>
                 <Workflow className="h-4 w-4" />

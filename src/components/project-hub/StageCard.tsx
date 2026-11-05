@@ -37,7 +37,7 @@ const StageCard = ({
       )}
     >
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 bg-emerald-500 transition-[width] duration-700 ease-out"
+        className="pointer-events-none absolute inset-y-0 left-0 bg-success transition-[width] duration-700 ease-out"
         style={{ width: done ? "100%" : "0%" }}
       />
 
@@ -48,22 +48,22 @@ const StageCard = ({
           onToggleDone();
         }}
         title={done ? "Mark as not done" : "Mark as done"}
-        className="absolute top-2 right-2 z-10 rounded-full p-0.5 transition-colors hover:bg-black/10"
+        className="absolute top-2 right-2 z-10 rounded-full p-0.5 transition-colors hover:bg-foreground/10"
       >
         <CheckCircle2
           className={cn(
             "h-5 w-5 transition-colors",
-            done ? "fill-white text-emerald-600" : "text-muted-foreground"
+            done ? "fill-success-foreground text-success" : "text-muted-foreground"
           )}
         />
       </button>
 
-      <CardContent className={cn("relative z-[1] p-4 space-y-1.5", done && "text-white")}>
+      <CardContent className={cn("relative z-[1] p-4 space-y-1.5", done && "text-success-foreground")}>
         <div className="flex items-center gap-2 pr-6">
           <span
             className={cn(
               "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-              done ? "bg-white text-emerald-600" : "bg-primary text-primary-foreground"
+              done ? "bg-success-foreground text-success" : "bg-primary text-primary-foreground"
             )}
           >
             {index}
@@ -75,16 +75,16 @@ const StageCard = ({
             Optional
           </Badge>
         )}
-        <p className={cn("text-xs", done ? "text-white/90" : "text-muted-foreground")}>
+        <p className={cn("text-xs", done ? "text-success-foreground/90" : "text-muted-foreground")}>
           {description}
         </p>
         {counts && counts.total > 0 && (
-          <div className={cn("pt-1 text-xs font-medium", done ? "text-white/90" : "text-muted-foreground")}>
+          <div className={cn("pt-1 text-xs font-medium", done ? "text-success-foreground/90" : "text-muted-foreground")}>
             {counts.complete}/{counts.semiComplete}/{counts.incomplete} | {counts.total}
           </div>
         )}
         {clickable && (
-          <div className={cn("pt-1 text-xs font-medium", done ? "text-white" : "text-primary")}>
+          <div className={cn("pt-1 text-xs font-medium", done ? "text-success-foreground" : "text-primary")}>
             Click to view regions →
           </div>
         )}
