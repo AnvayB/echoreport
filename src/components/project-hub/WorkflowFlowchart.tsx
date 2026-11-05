@@ -172,7 +172,7 @@ const WorkflowFlowchart = ({ onSelectRegionStage, overallCounts }: WorkflowFlowc
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8" />
+                <path d="M0,0 L10,5 L0,10 z" className="fill-muted-foreground" />
               </marker>
               <marker
                 id="ph-arrow-loop"
@@ -183,7 +183,7 @@ const WorkflowFlowchart = ({ onSelectRegionStage, overallCounts }: WorkflowFlowc
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" />
+                <path d="M0,0 L10,5 L0,10 z" className="fill-warning" />
               </marker>
             </defs>
 
@@ -197,7 +197,7 @@ const WorkflowFlowchart = ({ onSelectRegionStage, overallCounts }: WorkflowFlowc
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  stroke="#94a3b8"
+                  className="stroke-muted-foreground"
                   strokeWidth={2}
                   markerEnd="url(#ph-arrow-main)"
                 />
@@ -207,7 +207,7 @@ const WorkflowFlowchart = ({ onSelectRegionStage, overallCounts }: WorkflowFlowc
             <path
               d={loopPath}
               fill="none"
-              stroke="#f59e0b"
+              className="stroke-warning"
               strokeWidth={2}
               strokeDasharray="5 4"
               strokeLinejoin="round"
@@ -217,7 +217,7 @@ const WorkflowFlowchart = ({ onSelectRegionStage, overallCounts }: WorkflowFlowc
               x={(edge(4, "top").x + loopRightX) / 2}
               y={loopTopY - 8}
               textAnchor="middle"
-              className="fill-amber-600 dark:fill-amber-400"
+              className="fill-warning"
               fontSize={10}
               fontWeight={500}
             >

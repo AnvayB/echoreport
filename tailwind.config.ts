@@ -15,6 +15,7 @@ export default {
     extend: {
       colors: {
         "success": "hsl(var(--success))",
+        "success-foreground": "hsl(var(--success-foreground))",
         "warning": "hsl(var(--warning))",
         "caution": "hsl(var(--caution))",
         "aged": "hsl(var(--aged))",
