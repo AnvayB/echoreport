@@ -14,6 +14,17 @@ export default {
     },
     extend: {
       colors: {
+        "success": "hsl(var(--success))",
+        "warning": "hsl(var(--warning))",
+        "caution": "hsl(var(--caution))",
+        "aged": "hsl(var(--aged))",
+        "region-complete": "hsl(var(--region-complete))",
+        "region-complete-hover": "hsl(var(--region-complete-hover))",
+        "region-semi": "hsl(var(--region-semi))",
+        "region-semi-hover": "hsl(var(--region-semi-hover))",
+        "region-incomplete": "hsl(var(--region-incomplete))",
+        "region-incomplete-hover": "hsl(var(--region-incomplete-hover))",
+
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

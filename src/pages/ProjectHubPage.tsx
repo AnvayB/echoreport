@@ -15,6 +15,8 @@ import {
   type RegionWithSnapshot,
 } from "@/lib/projectHubUtils";
 
+import ThemeToggle from "@/components/ThemeToggle";
+
 const PROJECT_HUB_OWNER_EMAIL = "anvay.bhanap@gmail.com";
 
 type View = "flowchart" | "regions";
@@ -117,13 +119,14 @@ const ProjectHubPage = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
+            <div className="flex-1">
               <CardTitle>AE Projects Master / Project Hub Workflow</CardTitle>
               <CardDescription>
                 Track where each region's projects stand in the collect → Airtable → Project Hub
                 process.
               </CardDescription>
             </div>
+            <ThemeToggle />
           </div>
         </CardHeader>
         <CardContent>
@@ -155,12 +158,12 @@ const ProjectHubPage = () => {
                     );
                     const tint =
                       max === 0
-                        ? "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30"
+                        ? "bg-region-incomplete hover:bg-region-incomplete-hover"
                         : counts.complete === max
-                          ? "bg-green-50 hover:bg-green-100/70 dark:bg-green-950/30"
+                          ? "bg-region-complete hover:bg-region-complete-hover"
                           : counts.semiComplete === max
-                            ? "bg-yellow-50 hover:bg-yellow-100/70 dark:bg-yellow-950/30"
-                            : "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30";
+                            ? "bg-region-semi hover:bg-region-semi-hover"
+                            : "bg-region-incomplete hover:bg-region-incomplete-hover";
                     return (
                       <Card
                         key={region.id}

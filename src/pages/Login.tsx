@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState } from "react";
 import { toast } from "sonner";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,7 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Echo Report</CardTitle>
