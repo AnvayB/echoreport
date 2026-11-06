@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2, ChevronDown, ChevronUp, FolderPlus, Trash2,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Maximize2, ChevronDown, ChevronUp, FolderPlus, Trash2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -49,7 +49,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const {
     loading, loaded,
     completedYesterday, completedYesterdayDate, completedToday, pending, blockers,
-    pendingByBucket, grouping, regroupingAll, regroupAll,
+    pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, moveTaskToGroup, addMoreTasks, reload, setTaskImportant, editTaskText,
@@ -59,8 +59,6 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
-  const [regroupOpen, setRegroupOpen] = useState(false);
-  const [regroupPrompt, setRegroupPrompt] = useState("");
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Whole-section reorder drag (expanded board only): title being dragged and
@@ -788,46 +786,6 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           >
             <Dices className="h-4 w-4" />
           </button>
-          <Popover open={regroupOpen} onOpenChange={setRegroupOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                disabled={loading || adding || regroupingAll || pending.length === 0}
-                aria-label="Regroup topics"
-                title="Regroup topics (optionally with instructions)"
-                className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                <Layers className={`h-4 w-4 ${regroupingAll ? "animate-pulse" : ""}`} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-3 space-y-2">
-              <p className="text-sm font-medium">Regroup topics</p>
-              <Textarea
-                value={regroupPrompt}
-                onChange={(e) => setRegroupPrompt(e.target.value)}
-                placeholder='Optional, e.g. "Create a group for SQE"'
-                className="min-h-[70px] text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    setRegroupOpen(false);
-                    regroupAll(regroupPrompt);
-                  }
-                }}
-              />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setRegroupOpen(false);
-                    regroupAll(regroupPrompt);
-                  }}
-                >
-                  Regroup
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
           <button
             type="button"
             onClick={reload}
