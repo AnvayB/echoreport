@@ -448,12 +448,13 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
                 )}
               </Button>
             </div>
-            <div className="flex w-60 max-w-full shrink-0">
+            <div className="flex w-72 max-w-full shrink-0 gap-2">
               <Button
                 onClick={copyToClipboard}
                 disabled={!draft || loading}
                 size="sm"
-                className={copied ? "w-1/2 rounded-r-none" : "w-full"}
+                variant={copied ? "outline" : "default"}
+                className="flex-1 min-w-0"
               >
                 <Copy className="mr-2 h-4 w-4" /> Copy
               </Button>
@@ -462,7 +463,7 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
                   onClick={openInOutlook}
                   disabled={!draft || loading}
                   size="sm"
-                  className="w-1/2 rounded-l-none border-l border-primary-foreground/30"
+                  className="flex-1 min-w-0"
                 >
                   <Mail className="mr-2 h-4 w-4" /> Outlook Web
                 </Button>
