@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import WeeklyReportGenerator from "@/components/WeeklyReportGenerator";
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "report-owner" } }) }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), user: { id: "report-owner" } }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     functions: { invoke: mocks.invoke },
