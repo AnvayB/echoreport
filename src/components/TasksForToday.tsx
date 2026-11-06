@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Layers, Maximize2, ChevronDown, ChevronUp, FolderPlus, Trash2,
+  Loader2, ListTodo, CircleCheckBig, Check, Plus, Sparkles, X, GripVertical, AlertTriangle, Info, ChevronRight, RefreshCw, Dices, Maximize2, ChevronDown, ChevronUp, FolderPlus, Trash2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -49,7 +49,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const {
     loading, loaded,
     completedYesterday, completedYesterdayDate, completedToday, pending, blockers,
-    pendingByBucket, grouping, regroupingAll, regroupAll,
+    pendingByBucket, grouping,
     savingId, savedId,
     newTasksText, setNewTasksText, adding,
     toggleTask, deleteTask, moveTaskToBucket, moveTaskToGroup, addMoreTasks, reload, setTaskImportant, editTaskText,
@@ -59,8 +59,6 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   } = useTasksForToday();
 
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
-  const [regroupOpen, setRegroupOpen] = useState(false);
-  const [regroupPrompt, setRegroupPrompt] = useState("");
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Whole-section reorder drag (expanded board only): title being dragged and
