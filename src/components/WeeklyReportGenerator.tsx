@@ -140,12 +140,17 @@ interface ReportTemplate {
 const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   const { user } = useAuth();
   const [draft, setDraft] = useState("");
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  useEffect(() => {
+    setCopied(false);
+  }, [draft, open]);
 
   useEffect(() => {
     if (!user) return;
@@ -317,7 +322,9 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   };
 
   const copyToClipboard = async () => {
-    const result = await copyRichToClipboard(draft);
+    const { body } = splitSubject(draft);
+    const result = await copyRichToClipboard(body);
+    setCopied(result !== "failed");
     if (result === "rich") toast.success("Copied with formatting — paste anywhere");
     else if (result === "plain") toast.success("Copied as plain text");
     else toast.error("Couldn't copy to clipboard");
@@ -348,30 +355,13 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
   };
 
   const openInOutlook = () => {
-    const { subject, body } = splitSubject(draft);
+    const { subject } = splitSubject(draft);
 
     // Open the real Outlook compose URL synchronously from the click — opening a
     // blank tab first and redirecting it later gets blocked by popup blockers.
     const url =
       "https://outlook.office.com/mail/deeplink/compose?subject=" + encodeURIComponent(subject);
-    const outlookWindow = window.open(url, "_blank", "noopener,noreferrer");
-
-    // Outlook's compose deeplink only accepts a plain-text body, so the reliable way
-    // to land styled (bold/underline/bulleted) content in the email is to put real
-    // HTML on the clipboard and have the user paste it into the empty draft.
-    void copyRichToClipboard(body).then((result) => {
-      if (result === "rich") {
-        toast.success("Styled report copied — paste it (Ctrl/Cmd+V) into the email body");
-      } else if (result === "plain") {
-        toast.success("Copied as plain text — paste it (Ctrl/Cmd+V) into the email body");
-      } else {
-        toast.error("Couldn't copy the report — use the Copy button, then paste into Outlook");
-      }
-    });
-
-    if (!outlookWindow) {
-      toast.error("Your browser blocked the Outlook tab — allow popups for this site and try again");
-    }
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -445,12 +435,6 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
               <Button onClick={downloadMarkdown} variant="outline" size="sm" disabled={!draft || loading}>
                 <Download className="mr-2 h-4 w-4" /> Download .md
               </Button>
-              <Button onClick={openInOutlook} variant="outline" size="sm" disabled={!draft || loading}>
-                <Mail className="mr-2 h-4 w-4" /> Open in Outlook Web
-              </Button>
-              <Button onClick={generate} variant="ghost" size="sm" disabled={loading}>
-                Regenerate
-              </Button>
               <Button
                 onClick={() => setEditing((v) => !v)}
                 variant="ghost"
@@ -464,9 +448,26 @@ const WeeklyReportGenerator = ({ currentWeek }: WeeklyReportGeneratorProps) => {
                 )}
               </Button>
             </div>
-            <Button onClick={copyToClipboard} disabled={!draft || loading} size="sm">
-              <Copy className="mr-2 h-4 w-4" /> Copy
-            </Button>
+            <div className="flex w-60 max-w-full shrink-0">
+              <Button
+                onClick={copyToClipboard}
+                disabled={!draft || loading}
+                size="sm"
+                className={copied ? "w-1/2 rounded-r-none" : "w-full"}
+              >
+                <Copy className="mr-2 h-4 w-4" /> Copy
+              </Button>
+              {copied && (
+                <Button
+                  onClick={openInOutlook}
+                  disabled={!draft || loading}
+                  size="sm"
+                  className="w-1/2 rounded-l-none border-l border-primary-foreground/30"
+                >
+                  <Mail className="mr-2 h-4 w-4" /> Outlook Web
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
