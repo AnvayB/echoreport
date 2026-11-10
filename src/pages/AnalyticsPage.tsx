@@ -16,7 +16,8 @@ import {
   needsClassification, type CompletedTask, type RangeKey,
 } from "@/lib/analytics";
 
-const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"];
+const COLORS = Array.from({ length: 12 }, (_, i) => `hsl(var(--chart-${i + 1}))`);
+const colorFor = (g: string, i: number) => (g === "Other" || g === "Uncategorized" ? "hsl(var(--muted-foreground))" : COLORS[i % COLORS.length]);
 const RANGES: { key: RangeKey; label: string }[] = [
   { key: "7d", label: "1 week" }, { key: "30d", label: "30 days" }, { key: "month", label: "This month" }, { key: "all", label: "All time" },
 ];
@@ -95,10 +96,10 @@ const AnalyticsPage = () => {
   const days = new Set(inRange.map((t) => t.task_date));
   const workdays = [...days].filter((d) => { const w = parseISO(d).getDay(); return w > 0 && w < 6; }).length;
 
-  const config: ChartConfig = Object.fromEntries(series.keys.map((k, i) => [k, { label: k, color: COLORS[i % COLORS.length] }]));
+  const config: ChartConfig = Object.fromEntries(series.keys.map((k, i) => [k, { label: k, color: colorFor(k, i) }]));
   const barData = groupCounts.slice(0, 12);
   const pieData = series.keys.map((k, i) => ({
-    group: k, fill: COLORS[i % COLORS.length],
+    group: k, fill: colorFor(k, i),
     count: k === "Other" ? groupCounts.slice(series.keys.length - 1).reduce((s, c) => s + c.count, 0) : groupCounts.find((c) => c.group === k)?.count ?? 0,
   }));
 
@@ -157,7 +158,7 @@ const AnalyticsPage = () => {
                     <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={30} />
                     <ChartTooltip content={<ChartTooltipContent labelFormatter={(d) => format(parseISO(String(d)), "MMM d, yyyy")} />} />
                     {series.keys.map((k, i) => (
-                      <Line key={k} dataKey={k} type="monotone" stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} hide={hidden.has(k)} />
+                      <Line key={k} dataKey={k} type="monotone" stroke={colorFor(k, i)} strokeWidth={2} dot={false} hide={hidden.has(k)} />
                     ))}
                   </LineChart>
                 </ChartContainer>
@@ -165,7 +166,7 @@ const AnalyticsPage = () => {
                   {series.keys.map((k, i) => (
                     <button key={k} onClick={() => setHidden((h) => { const n = new Set(h); n.has(k) ? n.delete(k) : n.add(k); return n; })}
                       className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${hidden.has(k) ? "opacity-40" : ""}`}>
-                      <span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{k}
+                      <span className="h-2 w-2 rounded-full" style={{ background: colorFor(k, i) }} />{k}
                     </button>
                   ))}
                 </div>
@@ -181,7 +182,9 @@ const AnalyticsPage = () => {
                       <XAxis type="number" allowDecimals={false} hide />
                       <YAxis type="category" dataKey="group" width={150} tickLine={false} axisLine={false} />
                       <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="count" fill="var(--color-count)" radius={4} />
+                      <Bar dataKey="count" radius={4}>
+                        {barData.map((b, i) => <Cell key={b.group} fill={colorFor(b.group, i)} />)}
+                      </Bar>
                     </BarChart>
                   </ChartContainer>
                 </CardContent>
