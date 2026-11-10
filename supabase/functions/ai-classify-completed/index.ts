@@ -21,6 +21,8 @@ Deno.serve(async (req) => {
     const system = `You categorize completed work tasks into groups for an analytics dashboard.
 Locked groups (use VERBATIM whenever a task reasonably fits): ${groups.join(", ") || "(none)"}.
 Use keywords in the task text as strong signals: e.g. "CSP" -> a CSP group, "tickets timeline" -> Tickets Timeline, "project hub" -> Project Hub, "sales quote engine" or "SQE" -> Sales Quote Engine (match to the closest locked group title, case-insensitive, including acronyms).
+Sub-areas: company analytics, customer/ticket management, customer tickets -> Tickets Timeline. CSP enhancements or anything CSP -> the CSP overall group. SQE enhancements -> the Sales Quote Engine / SQE group. Read the task description carefully; most tasks name their project explicitly.
+Strongly prefer locked groups; do not invent sub-groups of an existing locked group.
 Only create a new short group title (2-4 words) when no locked group fits; reuse your new titles consistently. Avoid "Miscellaneous" unless nothing fits. Every id must get exactly one group.`;
     const list = valid.map((t: any) => `[id=${t.id}] ${String(t.task_text).slice(0, 300)}`).join("\n");
 
