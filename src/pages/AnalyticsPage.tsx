@@ -17,7 +17,7 @@ import {
 } from "@/lib/analytics";
 
 const COLORS = Array.from({ length: 12 }, (_, i) => `hsl(var(--chart-${i + 1}))`);
-const colorFor = (g: string, i: number) => (g === "Other" || g === "Uncategorized" ? "hsl(var(--muted-foreground))" : colorFor(k, i));
+const colorFor = (g: string, i: number) => (g === "Other" || g === "Uncategorized" ? "hsl(var(--muted-foreground))" : COLORS[i % COLORS.length]);
 const RANGES: { key: RangeKey; label: string }[] = [
   { key: "7d", label: "1 week" }, { key: "30d", label: "30 days" }, { key: "month", label: "This month" }, { key: "all", label: "All time" },
 ];
