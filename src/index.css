@@ -8,6 +8,18 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    --chart-1: 212 80% 48%;
+    --chart-2: 145 60% 38%;
+    --chart-3: 28 90% 52%;
+    --chart-4: 340 70% 52%;
+    --chart-5: 265 55% 55%;
+    --chart-6: 186 70% 40%;
+    --chart-7: 48 90% 45%;
+    --chart-8: 8 70% 50%;
+    --chart-9: 95 45% 42%;
+    --chart-10: 300 40% 48%;
+    --chart-11: 225 30% 45%;
+    --chart-12: 20 35% 45%;
     --background: 40 33% 96%;
     --foreground: 222.2 84% 4.9%;
 
@@ -68,6 +80,18 @@ All colors MUST be HSL.
   }
 
   .dark {
+    --chart-1: 212 85% 65%;
+    --chart-2: 145 55% 55%;
+    --chart-3: 28 90% 62%;
+    --chart-4: 340 75% 68%;
+    --chart-5: 265 65% 72%;
+    --chart-6: 186 65% 55%;
+    --chart-7: 48 90% 60%;
+    --chart-8: 8 80% 65%;
+    --chart-9: 95 50% 58%;
+    --chart-10: 300 50% 68%;
+    --chart-11: 225 40% 68%;
+    --chart-12: 20 45% 62%;
     color-scheme: dark;
     --background: 220 4% 16%;
     --foreground: 210 10% 92%;
