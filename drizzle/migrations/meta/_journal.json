@@ -15,6 +15,13 @@
       "when": 1792818822517,
       "tag": "0001_create_backlog_group_order",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794269337918,
+      "tag": "0002_add_analytics_group",
+      "breakpoints": true
     }
   ]
 }

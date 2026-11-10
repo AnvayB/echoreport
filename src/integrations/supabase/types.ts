@@ -91,6 +91,7 @@ export type Database = {
       }
       daily_tasks: {
         Row: {
+          analytics_group: string | null
           completed: boolean
           created_at: string
           group_title: string | null
@@ -101,6 +102,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analytics_group?: string | null
           completed?: boolean
           created_at?: string
           group_title?: string | null
@@ -111,6 +113,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          analytics_group?: string | null
           completed?: boolean
           created_at?: string
           group_title?: string | null
