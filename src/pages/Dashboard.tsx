@@ -9,7 +9,7 @@ import TasksForToday from "@/components/TasksForToday";
 import { TasksForTodayProvider } from "@/components/TasksForTodayProvider";
 import WeeklyReportGenerator from "@/components/WeeklyReportGenerator";
 import { getWeekdays, formatDateKey, formatWeekLabel, navigateWeek } from "@/lib/weekUtils";
-import { ChevronLeft, ChevronRight, LogOut, Settings, Workflow } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, LogOut, Settings, Workflow } from "lucide-react";
 import { isSameDay } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -53,6 +53,9 @@ const Dashboard = () => {
                 <Workflow className="h-4 w-4" />
               </Button>
             )}
+            <Button variant="ghost" size="icon" title="Analytics" onClick={() => navigate("/analytics")}>
+              <BarChart3 className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
               <Settings className="h-4 w-4" />
             </Button>
