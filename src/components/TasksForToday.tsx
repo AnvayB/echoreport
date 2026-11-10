@@ -453,7 +453,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   );
 
   // Scheduled panels share the same task controls and movement operations.
-  const renderBoardSchedulePanel = (bucket: "today" | "tomorrow") => {
+  const renderBoardSchedulePanel = (bucket: "today" | "tomorrow" | "thisWeek") => {
     const rows = (pendingByBucket[bucket] ?? []).flatMap((g) => g.rows);
     const panelKey = `board:${bucket}`;
     const isOver = dragOverGroupKey === panelKey;
@@ -710,7 +710,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   // Expanded board: distribute panels into responsive flex columns, balanced by
   // estimated height, so Tomorrow always ends up below the last right-side card.
   const boardGroups = pendingByBucket.backlog ?? [];
-  const boardBucketRowCount = (b: "today" | "tomorrow") =>
+  const boardBucketRowCount = (b: "today" | "tomorrow" | "thisWeek") =>
     (pendingByBucket[b] ?? []).flatMap((g) => g.rows).length;
   const boardPanels: { key: string; height: number; node: ReactNode }[] = [
     { key: "board:today", height: 96 + boardBucketRowCount("today") * 36, node: renderBoardSchedulePanel("today") },
@@ -720,6 +720,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       node: renderBacklogGroupPanel(g, gi, boardGroups, true),
     })),
     { key: "board:tomorrow", height: 96 + boardBucketRowCount("tomorrow") * 36, node: renderBoardSchedulePanel("tomorrow") },
+    { key: "board:thisWeek", height: 96 + boardBucketRowCount("thisWeek") * 36, node: renderBoardSchedulePanel("thisWeek") },
   ];
   const boardColumns = splitBoardPanels(boardPanels, boardPanels.map((p) => p.height), boardColumnCount);
 
