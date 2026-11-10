@@ -66,18 +66,24 @@ const AnalyticsPage = () => {
     setClassifying(true);
     try {
       const updated = new Map<string, string>();
-      for (let i = 0; i < targets.length; i += 100) {
-        const batch = targets.slice(i, i + 100);
-        const { data, error } = await supabase.functions.invoke("ai-classify-completed", {
-          body: { tasks: batch.map((t) => ({ id: t.id, task_text: t.task_text.replace(/^!! /, "") })), groups: [...lockedGroups, ...new Set(updated.values())] },
-        });
-        if (error) throw error;
-        const a: Record<string, string> = data?.assignments ?? {};
-        await Promise.all(Object.entries(a).map(([id, grp]) => {
-          updated.set(id, grp);
-          return supabase.from("daily_tasks").update({ analytics_group: grp }).eq("id", id);
-        }));
+      let failed = 0;
+      for (let i = 0; i < targets.length; i += 40) {
+        const batch = targets.slice(i, i + 40);
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const { data, error } = await supabase.functions.invoke("ai-classify-completed", {
+            body: { tasks: batch.map((t) => ({ id: t.id, task_text: t.task_text.replace(/^!! /, "") })), groups: [...new Set([...lockedGroups, ...updated.values()])] },
+          });
+          if (error) { if (attempt === 1) failed += batch.length; continue; }
+          const a: Record<string, string> = data?.assignments ?? {};
+          await Promise.all(Object.entries(a).map(([id, grp]) => {
+            updated.set(id, grp);
+            return supabase.from("daily_tasks").update({ analytics_group: grp }).eq("id", id);
+          }));
+          break;
+        }
+        setTasks((prev) => prev.map((t) => (updated.has(t.id) ? { ...t, analytics_group: updated.get(t.id)! } : t)));
       }
+      if (failed) toast.error(`${failed} tasks couldn't be categorized — try again`);
       setTasks((prev) => prev.map((t) => (updated.has(t.id) ? { ...t, analytics_group: updated.get(t.id)! } : t)));
       toast.success(`Categorized ${updated.size} tasks`);
     } catch {
