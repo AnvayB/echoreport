@@ -9,4 +9,4 @@
 
 - [x] Add an optional full-screen, multi-column Backlog board based on the supplied wireframe.
 - [x] Preserve task editing, completion, deletion, scheduling, and drag-and-drop in the expanded view.
-- [x] Verify compilation and layout constraints for desktop and narrow screens.
+- [x] Verify compilation and layout constraints for desktop and narrow screens.- [x] Analytics page; keyword hints (CSP, Tickets Timeline, Project Hub, SQE) for older tasks
