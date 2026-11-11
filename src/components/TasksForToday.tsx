@@ -58,9 +58,9 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
 
-  // Enter or Ctrl+Enter submits the Add More Tasks box; Shift+Enter keeps a newline.
+  // Ctrl+Enter (or Cmd+Enter) submits the Add More Tasks box; plain Enter keeps a newline.
   const handleAddTasksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       if (!adding && newTasksText.trim()) void addMoreTasks();
     }
