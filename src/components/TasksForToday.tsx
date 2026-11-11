@@ -58,6 +58,14 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
 
+  // Ctrl+Enter (or Cmd+Enter) submits the Add More Tasks box; plain Enter keeps a newline.
+  const handleAddTasksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!adding && newTasksText.trim()) void addMoreTasks();
+    }
+  };
+
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -883,6 +891,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
               className="min-h-[60px]"
               disabled={adding}
+              onKeyDown={handleAddTasksKeyDown}
             />
             {interimVoiceText && (
               <p className="text-sm text-muted-foreground italic px-1">{interimVoiceText}</p>
@@ -1065,6 +1074,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                   placeholder="Type any extra tasks (free-form). AI will turn them into concise items."
                   className="min-h-[40px] focus:min-h-[72px] transition-[min-height] text-sm"
                   disabled={adding}
+                  onKeyDown={handleAddTasksKeyDown}
                 />
                 {interimVoiceText && (
                   <p className="text-xs text-muted-foreground italic px-1 mt-1">{interimVoiceText}</p>
