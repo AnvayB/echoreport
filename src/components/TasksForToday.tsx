@@ -58,6 +58,14 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
     duplicateClusters, resolveDuplicateCluster, dismissDuplicateCluster,
   } = useTasksForToday();
 
+  // Enter or Ctrl+Enter submits the Add More Tasks box; Shift+Enter keeps a newline.
+  const handleAddTasksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!adding && newTasksText.trim()) void addMoreTasks();
+    }
+  };
+
   const [dragOverBucket, setDragOverBucket] = useState<Bucket | null>(null);
   const [dragOverGroupKey, setDragOverGroupKey] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
