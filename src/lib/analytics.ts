@@ -9,6 +9,7 @@ export interface CompletedTask {
   task_date: string;
   group_title: string | null;
   analytics_group: string | null;
+  created_at?: string;
 }
 
 export const effectiveGroup = (t: CompletedTask): string => {
@@ -49,6 +50,34 @@ export const countByGroup = (tasks: CompletedTask[]) => {
   const m = new Map<string, number>();
   tasks.forEach((t) => { const g = effectiveGroup(t); m.set(g, (m.get(g) ?? 0) + 1); });
   return [...m.entries()].map(([group, count]) => ({ group, count })).sort((a, b) => b.count - a.count);
+};
+
+/** Calendar days: completion is recorded as a date, not an exact timestamp. */
+export const completionDays = (task: CompletedTask): number | null => {
+  if (!task.created_at) return null;
+  const created = parseISO(task.created_at);
+  const completed = parseISO(task.task_date);
+  if (!Number.isFinite(created.getTime()) || !Number.isFinite(completed.getTime())) return null;
+  const days = differenceInCalendarDays(completed, created);
+  // Imported historical completions may predate their saved creation date.
+  return days >= 0 ? days : null;
+};
+
+export const averageCompletionByGroup = (tasks: CompletedTask[]) => {
+  const totals = new Map<string, { total: number; measured: number }>();
+  tasks.forEach((task) => {
+    const days = completionDays(task);
+    if (days === null) return;
+    const group = effectiveGroup(task);
+    const entry = totals.get(group) ?? { total: 0, measured: 0 };
+    entry.total += days;
+    entry.measured++;
+    totals.set(group, entry);
+  });
+  return countByGroup(tasks).map(({ group, count }) => {
+    const entry = totals.get(group);
+    return { group, count, measured: entry?.measured ?? 0, averageDays: entry ? entry.total / entry.measured : null };
+  });
 };
 
 /** Time series with one key per top group plus "Other". */

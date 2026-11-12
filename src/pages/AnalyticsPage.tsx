@@ -12,7 +12,7 @@ import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartToo
 import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import {
-  buildSeries, countByGroup, currentStreak, effectiveGroup, filterByRange, isImportant,
+  averageCompletionByGroup, buildSeries, countByGroup, currentStreak, effectiveGroup, filterByRange, isImportant,
   needsClassification, type CompletedTask, type RangeKey,
 } from "@/lib/analytics";
 
@@ -39,7 +39,7 @@ const AnalyticsPage = () => {
     const all: CompletedTask[] = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase.from("daily_tasks")
-        .select("id, task_text, task_date, group_title, analytics_group")
+        .select("id, task_text, task_date, group_title, analytics_group, created_at")
         .eq("user_id", user.id).eq("completed", true).order("task_date").range(from, from + 999);
       if (error) { toast.error("Couldn't load tasks"); break; }
       all.push(...(data as CompletedTask[]));
@@ -98,6 +98,7 @@ const AnalyticsPage = () => {
   const today = useMemo(() => new Date(), []);
   const inRange = useMemo(() => filterByRange(tasks, range, today), [tasks, range, today]);
   const groupCounts = useMemo(() => countByGroup(inRange), [inRange]);
+  const completionTimes = useMemo(() => averageCompletionByGroup(inRange), [inRange]);
   const series = useMemo(() => buildSeries(inRange, range, today), [inRange, range, today]);
   const days = new Set(inRange.map((t) => t.task_date));
   const workdays = [...days].filter((d) => { const w = parseISO(d).getDay(); return w > 0 && w < 6; }).length;
@@ -210,6 +211,36 @@ const AnalyticsPage = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Average completion time by group</CardTitle>
+                <p className="text-xs text-muted-foreground">Calendar days · Same-day completion = 0 days · Tasks without a valid creation date are excluded</p>
+              </CardHeader>
+              <CardContent>
+                {completionTimes.some((g) => g.averageDays !== null) && (
+                  <ChartContainer config={{ averageDays: { label: "Average days", color: "hsl(var(--chart-1))" } }} style={{ height: Math.max(200, completionTimes.length * 36) }} className="w-full">
+                    <BarChart data={completionTimes.filter((g) => g.averageDays !== null)} layout="vertical" margin={{ left: 10, right: 20 }}>
+                      <XAxis type="number" tickLine={false} axisLine={false} />
+                      <YAxis type="category" dataKey="group" width={150} tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => <span>{Number(value).toFixed(1)} days</span>} />} />
+                      <Bar dataKey="averageDays" radius={4}>
+                        {completionTimes.filter((g) => g.averageDays !== null).map((g) => <Cell key={g.group} fill={colorFor(g.group, groupCounts.findIndex((c) => c.group === g.group))} />)}
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b text-muted-foreground"><th className="py-2 text-left font-medium">Group</th><th className="py-2 text-right font-medium">Avg. days</th><th className="py-2 pl-4 text-right font-medium">Tasks measured</th></tr></thead>
+                    <tbody>
+                      {completionTimes.map((g) => <tr key={g.group} className="border-b last:border-0"><td className="py-2 pr-3">{g.group}</td><td className="py-2 text-right tabular-nums">{g.averageDays === null ? "—" : g.averageDays.toFixed(1)}</td><td className="py-2 pl-4 text-right tabular-nums text-muted-foreground">{g.measured} / {g.count}</td></tr>)}
+                    </tbody>
+                  </table>
+                </div>
+                {completionTimes.length === 0 && <p className="py-4 text-sm text-muted-foreground">No completed tasks in this range.</p>}
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader><CardTitle className="text-base">Groups</CardTitle></CardHeader>

@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Add date-filtered average creation-to-completion days by analytics group, with measured-task counts and unit tests.
+- [ ] Verify average completion times on signed-in analytics with real tasks — blocked because session minting could not match the requesting account; 8 analytics tests pass and preview build is clean.
+
 - [x] Add persistent charcoal dark mode and adapt accent colors across pages and expanded backlog.
 - [x] Verify light/dark switching and persistence on desktop and mobile (23 tests pass; browser verified sign-in screen, reload persistence, and mobile layout).
 - [ ] Verify signed-in dashboard and expanded backlog visually — blocked because session minting could not match the requesting account.
