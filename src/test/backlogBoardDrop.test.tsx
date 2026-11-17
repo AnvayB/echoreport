@@ -94,6 +94,15 @@ describe("backlog board drag-to-create", () => {
     expect(mocks.move).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1" }), "New Group");
   });
 
+  it("opens the random task picker from the expanded board", async () => {
+    render(<TasksForToday />);
+    fireEvent.click(screen.getByRole("button", { name: "Open expanded backlog" }));
+    const board = screen.getByRole("dialog");
+    fireEvent.click(within(board).getByRole("button", { name: "Pick a random task" }));
+    await waitFor(() => expect(screen.getByText("Your random task")).toBeInTheDocument());
+    expect(screen.getAllByText("Review SQE").length).toBeGreaterThan(0);
+  });
+
   it("does not create a group when a task is dropped outside groups in list view", () => {
     const { container } = render(<TasksForToday />);
     fireEvent.click(screen.getByText("Backlog"));

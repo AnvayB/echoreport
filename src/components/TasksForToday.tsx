@@ -90,6 +90,28 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
   const boardColumnCount = useBoardColumnCount();
   const [randomTask, setRandomTask] = useState<TaskRow | null>(null);
 
+  // Weighted random pick: recently added tasks are much more likely to be
+  // chosen (weekly half-life), but older tasks still have a chance.
+  const pickWeightedTask = (pool: TaskRow[], excludeId?: string) => {
+    const weights = pool.map((task) => {
+      const days = daysSince(task.created_at);
+      const age = days === null ? 14 : days; // unknown age counts as moderately old
+      return Math.pow(0.5, age / 7);
+    });
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let roll = Math.random() * total;
+      for (let i = 0; i < pool.length; i++) {
+        roll -= weights[i];
+        if (roll <= 0) {
+          if (excludeId && pool[i].id === excludeId && pool.length > 1) break;
+          return pool[i];
+        }
+      }
+    }
+    return pool[pool.length - 1];
+  };
+
   const rollRandomTask = () => {
     if (pending.length === 0) {
       setRandomTask(null);
@@ -99,14 +121,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
       setRandomTask(pending[0]);
       return;
     }
-    let next = pending[Math.floor(Math.random() * pending.length)];
-    // avoid repeating the same one back-to-back
-    let guard = 0;
-    while (randomTask && next.id === randomTask.id && guard < 10) {
-      next = pending[Math.floor(Math.random() * pending.length)];
-      guard++;
-    }
-    setRandomTask(next);
+    setRandomTask(pickWeightedTask(pending, randomTask?.id));
   };
 
   const openDice = () => {
@@ -968,6 +983,16 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               {renderBoardBucketTarget("tomorrow")}
               {renderBoardBucketTarget("thisWeek")}
               {renderNewGroupButton("board")}
+              <button
+                type="button"
+                onClick={openDice}
+                disabled={loading || adding || pending.length === 0}
+                aria-label="Pick a random task"
+                title="Pick a random task (recent tasks are more likely)"
+                className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <Dices className="h-4 w-4" />
+              </button>
               <ThemeToggle />
             </div>
             <DialogDescription className="sr-only">
