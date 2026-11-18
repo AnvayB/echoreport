@@ -989,7 +989,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
                 disabled={loading || adding || pending.length === 0}
                 aria-label="Pick a random task"
                 title="Pick a random task (recent tasks are more likely)"
-                className="text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+                className="text-foreground transition-colors disabled:opacity-50"
               >
                 <Dices className="h-4 w-4" />
               </button>
