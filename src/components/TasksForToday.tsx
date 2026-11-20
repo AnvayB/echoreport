@@ -882,7 +882,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               renderBucket(b, pendingByBucket[b])
             )}
             {blockers.length > 0 && (
-              <div className="rounded-lg border border-foreground bg-muted/50 p-3">
+              <div className="rounded-lg border border-panel-border bg-muted/50 p-3">
                 <p className="font-semibold text-sm text-foreground mb-2">Blockers & Follow-ups</p>
                 <div className="space-y-1.5">{blockers.map(renderCheckboxRow)}</div>
               </div>
@@ -933,7 +933,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
               Can't decide what to do next? Let the dice pick for you.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg border border-foreground bg-muted/50 p-4 min-h-[80px] flex items-center">
+          <div className="rounded-lg border border-panel-border bg-muted/50 p-4 min-h-[80px] flex items-center">
             {randomTask ? (
               <span className="text-base leading-snug text-foreground">
                 <TaskText text={randomTask.task_text} />

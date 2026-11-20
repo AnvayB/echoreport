@@ -1,6 +1,7 @@
 # Project architecture rules
 
 - Use the root next-themes provider and shared ThemeToggle for appearance; persist the preference locally and define theme colors as semantic CSS tokens so pages and dialogs stay consistent.
+- Use separate panel-border and control-border tokens rather than foreground colors for outlines, so structural borders can remain subtle without weakening interactive controls.
 
 - Keep alternate task layouts as views over `TasksForTodayContext`, so task data and mutations have one source of truth.
 - Empty-space board drops create task-backed groups through the shared task-movement operation; mark existing drop targets explicitly so background drops cannot intercept them.
