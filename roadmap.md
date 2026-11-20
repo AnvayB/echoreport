@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Soften dark-mode text, outlines, buttons, and status accents while keeping light mode unchanged.
+- [ ] Verify dimmed dark mode, contrast, and appearance on desktop and mobile.
+
 - [x] Add date-filtered average creation-to-completion days by analytics group, with measured-task counts and unit tests.
 - [ ] Verify average completion times on signed-in analytics with real tasks — blocked because session minting could not match the requesting account; 8 analytics tests pass and preview build is clean.
 

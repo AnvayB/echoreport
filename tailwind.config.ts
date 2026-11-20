@@ -27,6 +27,8 @@ export default {
         "region-incomplete-hover": "hsl(var(--region-incomplete-hover))",
 
         border: "hsl(var(--border))",
+        "panel-border": "hsl(var(--panel-border))",
+        "control-border": "hsl(var(--control-border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",

@@ -585,7 +585,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
         className={`rounded-lg border p-3 transition-colors ${
           isOver
             ? "border-primary bg-primary/5"
-            : "border-foreground bg-muted/50"
+            : "border-panel-border bg-muted/50"
         }`}
       >
         {bucket === "backlog" ? (
@@ -674,7 +674,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg border border-foreground bg-muted/50 p-3">
+          <div className="rounded-lg border border-panel-border bg-muted/50 p-3">
             <div className="space-y-1.5">
               {completedYesterday.map((row) => (
                 <div key={row.id} className="flex items-start gap-2">
@@ -702,7 +702,7 @@ const TasksForToday = ({ section = "pending" }: TasksForTodayProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg border border-foreground bg-muted/50 p-3">
+          <div className="rounded-lg border border-panel-border bg-muted/50 p-3">
             <div className="space-y-1.5">
               {completedToday.map((row) => (
                 <label key={row.id} className="flex items-start gap-2 cursor-pointer group">
